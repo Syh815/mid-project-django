@@ -9,7 +9,7 @@
         <!-- 登入標題與網站預覽圖 -->
         <div style="padding: 1.75rem 1.75rem 1.25rem; text-align: center; border-bottom: 1px solid var(--border-color); background: #fdfefe;">
             <div style="margin-bottom: 0.85rem;">
-                <img src="{% static 'image/preview.webp' %}" alt="系統預覽圖" 
+                <img src="{% static 'image/preview.webp' %}?v={% now 'U' %}" alt="系統預覽圖" 
                      style="width: 84px; height: 84px; border-radius: 14px; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.12); border: 2px solid #ffffff;">
             </div>
             <h2 style="font-size: 1.3rem; font-weight: 700; color: var(--univ-navy); margin: 0;">資訊管理學系 選課系統</h2>

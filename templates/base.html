@@ -6,10 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}資訊管理學系 網路選課系統 (資管一甲){% endblock %}</title>
     <!-- 網站預覽圖片與 Favicon -->
-    <link rel="icon" type="image/webp" href="{% static 'image/preview.webp' %}">
+    <link rel="icon" type="image/webp" href="{% static 'image/preview.webp' %}?v={% now 'U' %}">
     <meta property="og:title" content="資訊管理學系 網路選課與課表系統 (資管一甲)">
     <meta property="og:description" content="國立大學 資訊管理學系 學生網路選課與課表系統">
-    <meta property="og:image" content="{% static 'image/preview.webp' %}">
+    <meta property="og:image" content="{% static 'image/preview.webp' %}?v={% now 'U' %}">
     <!-- FontAwesome 6 Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <!-- 2020 經典校務行政系統樣式 -->
@@ -822,7 +822,7 @@ body {
             <div class="nav-user-panel">
                 {% if request.user.is_authenticated %}
                     <div class="user-identity-box">
-                        <img src="{{ request.user.profile.avatar_url }}" alt="頭像" class="user-avatar-nav">
+                        <img src="{{ request.user.profile.avatar_url }}?v={% now 'U' %}" alt="頭像" class="user-avatar-nav">
                         {% if is_admin %}
                             <span><strong>{{ request.user.first_name|default:request.user.username }}</strong> (教務處管理員)</span>
                         {% else %}
