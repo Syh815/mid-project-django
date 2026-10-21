@@ -8,7 +8,728 @@
     <!-- FontAwesome 6 Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <!-- 2020 經典校務行政系統樣式 -->
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20261021">
+    <style>
+/* ==========================================================================
+   國立大學 資管一甲 課表與選課系統 - 經典校務行政風格 (2020 Classic Portal Style)
+   ========================================================================== */
+
+:root {
+  /* 傳統大學校務藍色調 */
+  --univ-navy: #1b365d;
+  --univ-blue: #0056b3;
+  --univ-blue-light: #e7f1ff;
+  --univ-header: #24416b;
+
+  /* 功能色 */
+  --success: #198754;
+  --success-light: #d1e7dd;
+  --danger: #dc3545;
+  --danger-light: #f8d7da;
+  --warning: #b07d00;
+  --warning-light: #fff3cd;
+  --info: #0d6efd;
+  --info-light: #cff4fc;
+
+  /* 課表格子專用色彩（參考課表圖片第二張） */
+  --timetable-head-bg: #e2e3e5;
+  --timetable-cell-bg: #fffde7;
+  --timetable-border: #ced4da;
+  --timetable-text: #212529;
+
+  /* 中性底色與邊框 */
+  --bg-page: #f4f6f9;
+  --bg-card: #ffffff;
+  --border-color: #dee2e6;
+  --border-dark: #ced4da;
+  --text-main: #212529;
+  --text-muted: #6c757d;
+
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", "微軟正黑體", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--bg-page);
+  color: var(--text-main);
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+/* 頂部校務系統導航列 (Classic University Navbar) */
+.navbar {
+  background: var(--univ-navy);
+  color: #ffffff;
+  padding: 0.6rem 1.5rem;
+  border-bottom: 3px solid #f59e0b;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.nav-container {
+  max-width: 1300px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  text-decoration: none;
+  color: #ffffff;
+}
+
+.brand-badge {
+  background: #f59e0b;
+  color: #1b365d;
+  font-weight: 800;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 3px;
+}
+
+.brand-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.nav-user-panel {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.user-identity-box {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 0.35rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: #ffffff;
+}
+
+.btn-logout {
+  background: #dc3545;
+  color: #ffffff;
+  border: 1px solid #b02a37;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.825rem;
+  border-radius: 4px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: background 0.15s ease;
+}
+
+.btn-logout:hover {
+  background: #bb2d3b;
+}
+
+/* 主要版面容器 */
+.main-container {
+  max-width: 1300px;
+  margin: 1.25rem auto;
+  padding: 0 1rem;
+}
+
+/* 訊息通知 (Alerts) */
+.messages-container {
+  margin-bottom: 1rem;
+}
+
+.alert {
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  border: 1px solid transparent;
+}
+
+.alert-success {
+  background-color: var(--success-light);
+  color: #0f5132;
+  border-color: #badbcc;
+}
+
+.alert-error {
+  background-color: var(--danger-light);
+  color: #842029;
+  border-color: #f5c2c7;
+}
+
+.alert-warning {
+  background-color: var(--warning-light);
+  color: #664d03;
+  border-color: #ffecb5;
+}
+
+.alert-info {
+  background-color: var(--info-light);
+  color: #055160;
+  border-color: #b6effb;
+}
+
+.alert-close {
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: inherit;
+  line-height: 1;
+}
+
+/* 經典資訊看板 (Dashboard Header Bar) */
+.info-header-card {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-left: 5px solid var(--univ-navy);
+  border-radius: 4px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.info-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--univ-navy);
+  margin-bottom: 0.25rem;
+}
+
+.info-desc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.info-stats-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.info-stat-box {
+  background: #f8fafc;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.5rem 0.85rem;
+  text-align: center;
+  min-width: 90px;
+}
+
+.info-stat-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--univ-navy);
+  line-height: 1.2;
+}
+
+.info-stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* 頁籤選單 (Classic Tabs) */
+.portal-tabs {
+  display: flex;
+  border-bottom: 2px solid var(--univ-navy);
+  margin-bottom: 1.25rem;
+  gap: 0.25rem;
+  overflow-x: auto;
+}
+
+.portal-tab-item {
+  padding: 0.6rem 1.25rem;
+  font-size: 0.925rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  background: #e9ecef;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.portal-tab-item:hover {
+  background: #dee2e6;
+  color: var(--text-main);
+}
+
+.portal-tab-item.active {
+  background: var(--univ-navy);
+  color: #ffffff;
+  border-color: var(--univ-navy);
+}
+
+/* ==========================================================================
+   課表主表格 (Timetable Grid - 完全參考第二張圖片風格)
+   ========================================================================== */
+.timetable-container {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.timetable-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.timetable-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  background: #ffffff;
+}
+
+.timetable-table th,
+.timetable-table td {
+  border: 1px solid var(--timetable-border);
+  padding: 0.5rem;
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* 標頭與節次欄（淡灰色，參考圖片二） */
+.timetable-table th {
+  background-color: var(--timetable-head-bg);
+  font-weight: 700;
+  color: #333333;
+  padding: 0.65rem 0.5rem;
+}
+
+.period-head-col {
+  width: 110px;
+}
+
+.period-cell {
+  background-color: var(--timetable-head-bg);
+  color: #333333;
+}
+
+.period-name {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.period-time-range {
+  font-size: 0.75rem;
+  color: #555555;
+  margin-top: 0.15rem;
+}
+
+/* 有課的儲存格：經典淡米黃底色 (#fffde7)，參考圖片二 */
+.course-cell-filled {
+  background-color: var(--timetable-cell-bg) !important;
+  vertical-align: middle !important;
+  padding: 0.6rem 0.4rem !important;
+  height: 100%;
+}
+
+.course-cell-title {
+  color: #0056b3;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  line-height: 1.35;
+  margin-bottom: 0.25rem;
+}
+
+.course-cell-title:hover {
+  color: #003366;
+}
+
+.course-cell-teacher {
+  font-size: 0.8rem;
+  color: #333333;
+  margin-bottom: 0.15rem;
+}
+
+.course-cell-room {
+  font-size: 0.78rem;
+  color: #555555;
+  margin-bottom: 0.35rem;
+}
+
+.course-cell-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+/* 空堂儲存格 */
+.empty-cell {
+  background-color: #ffffff;
+  color: #adb5bd;
+  font-size: 0.75rem;
+}
+
+/* 共同空堂文字（如週一8~9節） */
+.common-free-text {
+  color: #6c757d;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* 退選按鈕 */
+.btn-timetable-drop {
+  display: inline-block;
+  background: transparent;
+  color: #dc3545;
+  border: 1px solid #f1aeb5;
+  font-size: 0.7rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 2px;
+  cursor: pointer;
+  margin-top: 0.25rem;
+}
+
+.btn-timetable-drop:hover {
+  background: #dc3545;
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   選修課程列表卡片 (Electives)
+   ========================================================================== */
+.card-classic {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.card-classic-header {
+  background: #f8fafc;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  color: var(--univ-navy);
+}
+
+.card-classic-body {
+  padding: 1rem;
+}
+
+.electives-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.electives-table th,
+.electives-table td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.electives-table th {
+  background-color: #f1f3f5;
+  color: #495057;
+  font-weight: 700;
+  border-top: 1px solid var(--border-color);
+}
+
+/* 類別與選修開關專用類別（解決強制分行跑版問題） */
+.badge-tag {
+  display: inline-block !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  padding: 0.2rem 0.55rem !important;
+  border-radius: 3px !important;
+  white-space: nowrap !important;
+  line-height: 1.2 !important;
+}
+
+.badge-required {
+  background-color: #0d6efd !important;
+  color: #ffffff !important;
+}
+
+.badge-elective {
+  background-color: #198754 !important;
+  color: #ffffff !important;
+}
+
+.badge-closed {
+  background-color: #6c757d !important;
+  color: #ffffff !important;
+}
+
+.badge-open {
+  background-color: #198754 !important;
+  color: #ffffff !important;
+}
+
+/* 開放學生選修開關按鈕（嚴格防分行） */
+.switch-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  padding: 0.3rem 0.65rem !important;
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  border-radius: 4px !important;
+  border: 1px solid transparent !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  text-decoration: none !important;
+}
+
+.switch-btn.open {
+  background-color: #d1e7dd !important;
+  color: #0f5132 !important;
+  border-color: #badbcc !important;
+}
+
+.switch-btn.open:hover {
+  background-color: #c1e0d0 !important;
+}
+
+.switch-btn.closed {
+  background-color: #e9ecef !important;
+  color: #6c757d !important;
+  border-color: #ced4da !important;
+}
+
+.switch-btn.closed:hover {
+  background-color: #dde0e3 !important;
+}
+
+/* 表格欄位寬度鎖定（避免擠壓破版） */
+.col-code { width: 90px; }
+.col-name { min-width: 170px; }
+.col-category { width: 80px; white-space: nowrap !important; text-align: center; }
+.col-time { width: 140px; white-space: nowrap !important; }
+.col-room { width: 130px; }
+.col-teacher { width: 95px; }
+.col-credits { width: 65px; text-align: center; }
+.col-enrolled { width: 95px; text-align: center; }
+.col-toggle { width: 175px; white-space: nowrap !important; text-align: center; }
+.col-actions { width: 120px; white-space: nowrap !important; text-align: center; }
+
+/* 按鈕樣式 (Classic Bootstrap 4/5 實用風格) */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.btn-primary {
+  background-color: var(--univ-blue);
+  color: #ffffff;
+  border-color: #0a58ca;
+}
+
+.btn-primary:hover {
+  background-color: #0b5ed7;
+}
+
+.btn-success {
+  background-color: var(--success);
+  color: #ffffff;
+  border-color: #146c43;
+}
+
+.btn-success:hover {
+  background-color: #157347;
+}
+
+.btn-danger {
+  background-color: var(--danger);
+  color: #ffffff;
+  border-color: #b02a37;
+}
+
+.btn-danger:hover {
+  background-color: #bb2d3b;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: #ffffff;
+  border-color: #565e64;
+}
+
+.btn-secondary:hover {
+  background-color: #5c636a;
+}
+
+.btn-outline-danger {
+  background-color: #ffffff;
+  color: #dc3545;
+  border-color: #dc3545;
+}
+
+.btn-outline-danger:hover {
+  background-color: #dc3545;
+  color: #ffffff;
+}
+
+.btn-disabled {
+  background-color: #e9ecef;
+  color: #6c757d;
+  border-color: #ced4da;
+  cursor: not-allowed;
+}
+
+/* Modal 彈出視窗 */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-overlay.active {
+  display: flex;
+}
+
+.modal-content {
+  background: #ffffff;
+  border-radius: 4px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.modal-header {
+  padding: 0.85rem 1.25rem;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--univ-navy);
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+  color: #6c757d;
+}
+
+.modal-body {
+  padding: 1.25rem;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+  color: #333333;
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid #ced4da;
+  border-radius: 3px;
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #86b7fe;
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+}
+
+.modal-footer {
+  padding: 0.75rem 1.25rem;
+  background: #f8fafc;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* 頁尾 */
+.footer {
+  text-align: center;
+  padding: 1.5rem 1rem;
+  color: #6c757d;
+  font-size: 0.8rem;
+  border-top: 1px solid var(--border-color);
+  margin-top: 2rem;
+  background: #ffffff;
+}
+
+    </style>
     {% block extra_head %}{% endblock %}
 </head>
 <body>
