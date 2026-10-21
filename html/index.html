@@ -1,0 +1,940 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+
+<!-- 頂部資訊看板 (2020 經典校務行政風格) -->
+<div class="info-header-card">
+    <div>
+        <div class="info-title">
+            {% if is_admin %}
+                <i class="fa-solid fa-screwdriver-wrench" style="color: var(--univ-navy);"></i> 資管一甲 • 教務課程維護管理
+            {% else %}
+                <i class="fa-solid fa-address-card" style="color: var(--univ-navy);"></i> 資管一甲 • 學生選課系統 (張家豪)
+            {% endif %}
+        </div>
+        <div class="info-desc">
+            {% if is_admin %}
+                您正在以<strong>【教務處管理員 (admin)】</strong>身份操作。您可檢視與調整資管一甲所有的課程資料、上課節次與教室，並隨時<strong>切換各課程是否開放學生選修</strong>。
+            {% else %}
+                學生姓名：<strong>張家豪</strong> ｜ 學號：<strong>B11305001</strong> ｜ 班級：<strong>資管一甲</strong>。以下為您本學期標準課表，您可於「額外選修加選區」自主加退選課程。
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 統計數據看板 -->
+    <div class="info-stats-row">
+        {% if not is_admin %}
+            <div class="info-stat-box">
+                <div class="info-stat-value">{{ total_credits }}</div>
+                <div class="info-stat-label">已選總學分</div>
+            </div>
+            <div class="info-stat-box">
+                <div class="info-stat-value">{{ required_credits }}</div>
+                <div class="info-stat-label">必修學分</div>
+            </div>
+            <div class="info-stat-box">
+                <div class="info-stat-value">{{ elective_credits }}</div>
+                <div class="info-stat-label">選修學分</div>
+            </div>
+            <div class="info-stat-box">
+                <div class="info-stat-value">{{ course_count }}</div>
+                <div class="info-stat-label">已選門數</div>
+            </div>
+        {% else %}
+            <!-- 管理員端：依要求移除必修科目數，開放選修數同步真實數量 -->
+            <div class="info-stat-box">
+                <div class="info-stat-value">{{ total_courses_count }}</div>
+                <div class="info-stat-label">總開設課程</div>
+            </div>
+            <div class="info-stat-box" style="border-left: 3px solid var(--success);">
+                <div class="info-stat-value" style="color: var(--success);">{{ open_courses_count }}</div>
+                <div class="info-stat-label">開放選修中</div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 系統功能選單頁籤 (Classic Tabs) -->
+<nav class="portal-tabs" id="portalTabNav">
+    {% if not is_admin %}
+        <a href="?tab=timetable" class="portal-tab-item {% if tab == 'timetable' %}active{% endif %}" data-tab="tab-timetable">
+            <i class="fa-regular fa-calendar-days"></i> 我的週課表
+        </a>
+        <a href="?tab=electives" class="portal-tab-item {% if tab == 'electives' %}active{% endif %}" data-tab="tab-electives">
+            <i class="fa-solid fa-plus-circle"></i> 額外選修加選區
+        </a>
+        <a href="?tab=enrolled" class="portal-tab-item {% if tab == 'enrolled' %}active{% endif %}" data-tab="tab-enrolled">
+            <i class="fa-solid fa-list-check"></i> 已選課程明細
+        </a>
+    {% else %}
+        <a href="?tab=admin_courses" class="portal-tab-item {% if tab == 'admin_courses' %}active{% endif %}" data-tab="tab-admin-courses">
+            <i class="fa-solid fa-list-check"></i> 全系課程維護與選修開關
+        </a>
+        <a href="?tab=timetable" class="portal-tab-item {% if tab == 'timetable' %}active{% endif %}" data-tab="tab-timetable">
+            <i class="fa-solid fa-table"></i> 資管一甲標準課表總覽
+        </a>
+        <a href="?tab=students_roster" class="portal-tab-item {% if tab == 'students_roster' %}active{% endif %}" data-tab="tab-students-roster">
+            <i class="fa-solid fa-users"></i> 學生選課名冊統計
+        </a>
+    {% endif %}
+</nav>
+
+<!-- ==========================================
+     TAB 1: 週課表視圖 (Timetable View)
+     完全參考第二張圖片排版與視覺樣式
+     ========================================== -->
+<div class="tab-pane" id="pane-tab-timetable" {% if tab != 'timetable' %}style="display: none;"{% endif %}>
+    <div class="timetable-container">
+        <div class="timetable-header-bar">
+            <div>
+                <strong style="font-size: 1.05rem; color: var(--univ-navy);">
+                    <i class="fa-solid fa-table-cells"></i>
+                    {% if not is_admin %}資管一甲 • 學生個人本學期每週課表 (張家豪){% else %}資管一甲 • 全班標準每週課表總覽{% endif %}
+                </strong>
+            </div>
+            <div style="font-size: 0.85rem; display: flex; gap: 0.75rem; align-items: center;">
+                <span>圖例：</span>
+                <span class="badge-tag badge-required">必修</span>
+                <span class="badge-tag badge-elective">選修</span>
+            </div>
+        </div>
+
+        <div style="overflow-x: auto;">
+            <table class="timetable-table">
+                <thead>
+                    <tr>
+                        <th class="period-head-col">節次</th>
+                        {% for day in days_info %}
+                            <th>{{ day.name }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in period_info %}
+                        <tr>
+                            <!-- 節次與時間欄 (灰底，如圖二) -->
+                            <td class="period-cell">
+                                <div class="period-name">{{ p.name }}</div>
+                                <div class="period-time-range">{{ p.time }}</div>
+                            </td>
+
+                            {% for day in days_info %}
+                                {% with p_num=p.period d_num=day.day %}
+                                    {% for slot_p, days_dict in timetable.items %}
+                                        {% if slot_p == p_num %}
+                                            {% for slot_d, cell in days_dict.items %}
+                                                {% if slot_d == d_num %}
+                                                    {% if cell.type == 'course' %}
+                                                        <!-- 填入課程的格子：米黃底色、藍色課名加底線、教師、教室（參考圖二） -->
+                                                        <td rowspan="{{ cell.rowspan }}" class="course-cell-filled">
+                                                            <div class="course-cell-title" 
+                                                                 onclick="openCourseDetailModal('{{ cell.course.name|escapejs }}', '{{ cell.course.code }}', '{{ cell.course.teacher }}', '{{ cell.course.classroom }}', '{{ cell.course.credits }}', '{{ cell.course.get_category_display }}', '{{ cell.course.period_display }}', '{{ cell.course.description|escapejs }}', '{{ cell.course.is_open_for_enrollment }}')">
+                                                                {{ cell.course.name }}
+                                                            </div>
+                                                            <div class="course-cell-teacher">{{ cell.course.teacher }}</div>
+                                                            <div class="course-cell-room">{{ cell.course.classroom }}</div>
+                                                            <div>
+                                                                <span class="badge-tag {% if cell.course.category == 'REQUIRED' %}badge-required{% else %}badge-elective{% endif %}">
+                                                                    {{ cell.course.get_category_display }}
+                                                                </span>
+                                                            </div>
+
+                                                            {% if not is_admin and cell.course.category == 'ELECTIVE' %}
+                                                                <form action="{% url 'pages:drop_course' cell.course.id %}" method="POST" onsubmit="return confirm('確定要退選【{{ cell.course.name }}】嗎？');">
+                                                                    {% csrf_token %}
+                                                                    <input type="hidden" name="next" value="/?tab=timetable">
+                                                                    <button type="submit" class="btn-timetable-drop" title="退選此課程">
+                                                                        退選
+                                                                    </button>
+                                                                </form>
+                                                            {% endif %}
+                                                        </td>
+                                                    {% elif cell.type == 'occupied' %}
+                                                        <!-- 跨節次佔用，不渲染 td -->
+                                                    {% else %}
+                                                        <!-- 空堂，若為週一第8、9節顯示圖二的「共同空堂」 -->
+                                                        <td class="empty-cell">
+                                                            {% if day.day == 1 and p.period >= 8 and p.period <= 9 %}
+                                                                <span class="common-free-text">共同空堂</span>
+                                                            {% else %}
+                                                                &nbsp;
+                                                            {% endif %}
+                                                        </td>
+                                                    {% endif %}
+                                                {% endif %}
+                                            {% endfor %}
+                                        {% endif %}
+                                    {% endfor %}
+                                {% endwith %}
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+
+<!-- ==========================================
+     TAB 2: 額外選修加選區 (For Student)
+     ========================================== -->
+{% if not is_admin %}
+<div class="tab-pane" id="pane-tab-electives" {% if tab != 'electives' %}style="display: none;"{% endif %}>
+    <div class="card-classic">
+        <div class="card-classic-header">
+            <div>
+                <i class="fa-solid fa-book-open"></i> 可供自主選修之額外課程清單
+            </div>
+            <div style="font-weight: normal; font-size: 0.85rem; color: var(--text-muted);">
+                共 <strong>{{ elective_courses_data|length }}</strong> 門選修課程供選讀
+            </div>
+        </div>
+        <div class="card-classic-body">
+            <div style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                <input type="text" id="electiveSearchInput" class="form-control" style="max-width: 350px;" placeholder="搜尋課程名稱、教師或代碼..." onkeyup="filterElectiveRows()">
+                <div style="font-size: 0.8rem; color: #666;">
+                    * 點擊「加選」可立即排入每週課表，若遇衝突時段系統將自動防衝堂。
+                </div>
+            </div>
+
+            <div style="overflow-x: auto;">
+                <table class="electives-table" id="electivesTable">
+                    <thead>
+                        <tr>
+                            <th class="col-code">課程代碼</th>
+                            <th class="col-name">課程名稱</th>
+                            <th class="col-category">類別</th>
+                            <th class="col-time">上課時段</th>
+                            <th class="col-room">教室</th>
+                            <th class="col-teacher">授課教師</th>
+                            <th class="col-credits">學分</th>
+                            <th class="col-enrolled">名額狀況</th>
+                            <th class="col-toggle">選修狀態</th>
+                            <th class="col-actions">動作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in elective_courses_data %}
+                            {% if item.course.category == 'ELECTIVE' %}
+                                <tr class="elective-table-row" 
+                                    data-name="{{ item.course.name|lower }}" 
+                                    data-teacher="{{ item.course.teacher|lower }}" 
+                                    data-code="{{ item.course.code|lower }}">
+                                    <td><code>{{ item.course.code }}</code></td>
+                                    <td>
+                                        <strong style="color: var(--univ-navy);">{{ item.course.name }}</strong>
+                                        <div style="font-size: 0.75rem; color: #666; margin-top: 0.15rem;">
+                                            {{ item.course.description|default:"暫無簡介" }}
+                                        </div>
+                                    </td>
+                                    <!-- 類別欄位：嚴格單行不破版 -->
+                                    <td class="col-category">
+                                        <span class="badge-tag badge-elective">選修</span>
+                                    </td>
+                                    <td class="col-time">{{ item.course.period_display }}</td>
+                                    <td>{{ item.course.classroom }}</td>
+                                    <td><strong>{{ item.course.teacher }}</strong></td>
+                                    <td style="text-align: center;">{{ item.course.credits }}</td>
+                                    <td style="text-align: center;">
+                                        {{ item.course.current_enrolled_count }} / {{ item.course.max_students }}
+                                    </td>
+                                    <td class="col-toggle">
+                                        {% if item.is_open %}
+                                            <span style="color: var(--success); font-weight: 600; font-size: 0.825rem;">
+                                                <i class="fa-solid fa-circle-check"></i> 開放選修中
+                                            </span>
+                                        {% else %}
+                                            <span style="color: #6c757d; font-size: 0.825rem;">
+                                                <i class="fa-solid fa-lock"></i> 教務處未開放
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="col-actions">
+                                        {% if item.is_enrolled %}
+                                            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                                <span style="color: var(--success); font-size: 0.8rem; font-weight: 700;">已選修</span>
+                                                <form action="{% url 'pages:drop_course' item.course.id %}" method="POST" onsubmit="return confirm('確定要退選【{{ item.course.name }}】嗎？');">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="next" value="/?tab=electives">
+                                                    <button type="submit" class="btn btn-outline-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
+                                                        退選
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        {% elif not item.is_open %}
+                                            <button type="button" class="btn btn-disabled" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;" disabled>
+                                                未開放
+                                            </button>
+                                        {% elif item.conflict_with %}
+                                            <button type="button" class="btn btn-disabled" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; color: #b07d00;" disabled title="與【{{ item.conflict_with.name }}】時段衝突">
+                                                衝堂無法選
+                                            </button>
+                                        {% elif item.is_full %}
+                                            <button type="button" class="btn btn-disabled" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;" disabled>
+                                                額滿
+                                            </button>
+                                        {% else %}
+                                            <form action="{% url 'pages:enroll_course' item.course.id %}" method="POST">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-primary" style="padding: 0.25rem 0.65rem; font-size: 0.8rem;" id="btn-enroll-{{ item.course.id }}">
+                                                    <i class="fa-solid fa-plus"></i> 加選
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==========================================
+     TAB 3: 已選課程清單 (For Student)
+     ========================================== -->
+<div class="tab-pane" id="pane-tab-enrolled" {% if tab != 'enrolled' %}style="display: none;"{% endif %}>
+    <div class="card-classic">
+        <div class="card-classic-header">
+            <div>
+                <i class="fa-solid fa-clipboard-check"></i> 張家豪 本學期已選全部修習課程名冊
+            </div>
+            <div style="font-weight: normal; font-size: 0.85rem; color: var(--text-muted);">
+                共 <strong>{{ enrolled_courses|length }}</strong> 門課程，合計 <strong>{{ total_credits }}</strong> 學分
+            </div>
+        </div>
+        <div class="card-classic-body" style="padding: 0;">
+            <table class="electives-table">
+                <thead>
+                    <tr>
+                        <th class="col-code">課程代碼</th>
+                        <th class="col-name">課程名稱</th>
+                        <th class="col-category">類別</th>
+                        <th class="col-time">上課時段</th>
+                        <th class="col-room">教室</th>
+                        <th class="col-teacher">授課教師</th>
+                        <th class="col-credits">學分</th>
+                        <th class="col-toggle">修課狀態</th>
+                        <th class="col-actions">動作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for course in enrolled_courses %}
+                        <tr>
+                            <td><code>{{ course.code }}</code></td>
+                            <td><strong>{{ course.name }}</strong></td>
+                            <td class="col-category">
+                                <span class="badge-tag {% if course.category == 'REQUIRED' %}badge-required{% else %}badge-elective{% endif %}">
+                                    {{ course.get_category_display }}
+                                </span>
+                            </td>
+                            <td>{{ course.period_display }}</td>
+                            <td>{{ course.classroom }}</td>
+                            <td>{{ course.teacher }}</td>
+                            <td style="text-align: center;"><strong>{{ course.credits }}</strong></td>
+                            <td class="col-toggle">
+                                <span style="color: var(--success); font-weight: 600; font-size: 0.825rem;">
+                                    <i class="fa-solid fa-check"></i> 修習中
+                                </span>
+                            </td>
+                            <td class="col-actions">
+                                {% if course.category == 'ELECTIVE' %}
+                                    <form action="{% url 'pages:drop_course' course.id %}" method="POST" onsubmit="return confirm('確定要退選【{{ course.name }}】嗎？');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="/?tab=enrolled">
+                                        <button type="submit" class="btn btn-outline-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
+                                            退選
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <span style="font-size: 0.75rem; color: #6c757d;">班級必修</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="9" style="text-align: center; padding: 2rem; color: #888;">
+                                尚未有選課資料。
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+<!-- ==========================================
+     ADMIN TAB 1: 全系課程維護與選修開關 (For Admin)
+     修復跑版問題：類別與按鈕嚴格單行不折行
+     ========================================== -->
+{% if is_admin %}
+<div class="tab-pane" id="pane-tab-admin-courses" {% if tab != 'admin_courses' %}style="display: none;"{% endif %}>
+    <div class="card-classic">
+        <div class="card-classic-header">
+            <div>
+                <i class="fa-solid fa-sliders"></i> 資管一甲 課程維護管理與選修開放設定
+            </div>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button type="button" class="btn btn-primary" onclick="openAddCourseModal()" id="btn-add-course">
+                    <i class="fa-solid fa-plus"></i> 新增課程
+                </button>
+                <form action="{% url 'pages:reset_database' %}" method="POST" onsubmit="return confirm('確定要重設為資管一甲標準課表嗎？這將還原初始示範資料。');" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-secondary" title="還原初始資料庫狀態">
+                        <i class="fa-solid fa-rotate-left"></i> 重設資料
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card-classic-body" style="padding: 0; overflow-x: auto;">
+            <table class="electives-table">
+                <thead>
+                    <tr>
+                        <th class="col-code">代碼</th>
+                        <th class="col-name">課程名稱</th>
+                        <th class="col-category">類別</th>
+                        <th class="col-time">上課時段</th>
+                        <th class="col-room">教室</th>
+                        <th class="col-teacher">授課教師</th>
+                        <th class="col-credits">學分</th>
+                        <th class="col-enrolled">修課人數</th>
+                        <th class="col-toggle">開放學生選修</th>
+                        <th class="col-actions">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for course in all_courses %}
+                        <tr>
+                            <td class="col-code"><code>{{ course.code }}</code></td>
+                            <td class="col-name">
+                                <strong>{{ course.name }}</strong>
+                            </td>
+                            <!-- 類別欄位：嚴格維持單行，修復分行破版 -->
+                            <td class="col-category">
+                                <span class="badge-tag {% if course.category == 'REQUIRED' %}badge-required{% else %}badge-elective{% endif %}">
+                                    {{ course.get_category_display }}
+                                </span>
+                            </td>
+                            <td class="col-time">{{ course.period_display }}</td>
+                            <td class="col-room">{{ course.classroom }}</td>
+                            <td class="col-teacher"><strong>{{ course.teacher }}</strong></td>
+                            <td class="col-credits">{{ course.credits }}</td>
+                            <td class="col-enrolled">
+                                <strong>{{ course.current_enrolled_count }}</strong> / {{ course.max_students }}
+                            </td>
+                            <!-- 一鍵切換開放學生選修按鈕：修復強制分行問題 -->
+                            <td class="col-toggle">
+                                <form action="{% url 'pages:toggle_course_status' course.id %}" method="POST" style="display: inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" 
+                                            class="switch-btn {% if course.is_open_for_enrollment %}open{% else %}closed{% endif %}"
+                                            id="toggle-btn-{{ course.id }}"
+                                            title="點擊切換是否開放讓學生選修">
+                                        {% if course.is_open_for_enrollment %}
+                                            <i class="fa-solid fa-check-circle"></i> 開放選修中 (點擊關閉)
+                                        {% else %}
+                                            <i class="fa-solid fa-times-circle"></i> 未開放 (點擊開放)
+                                        {% endif %}
+                                    </button>
+                                </form>
+                            </td>
+                            <td class="col-actions">
+                                <button type="button" 
+                                        class="btn btn-secondary" 
+                                        style="padding: 0.2rem 0.5rem; font-size: 0.75rem;"
+                                        onclick="openEditCourseModal('{{ course.id }}', '{{ course.code }}', '{{ course.name|escapejs }}', '{{ course.teacher|escapejs }}', '{{ course.classroom|escapejs }}', '{{ course.credits }}', '{{ course.category }}', '{{ course.day_of_week }}', '{{ course.start_period }}', '{{ course.end_period }}', '{{ course.is_open_for_enrollment }}', '{{ course.max_students }}', '{{ course.description|escapejs }}', '{{ course.color_tag }}')">
+                                    編輯
+                                </button>
+                                <form action="{% url 'pages:delete_course' course.id %}" method="POST" onsubmit="return confirm('確定要刪除課程【{{ course.name }}】嗎？');" style="display: inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
+                                        刪除
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ==========================================
+     ADMIN TAB 2: 學生修課名冊統計 (For Admin)
+     ========================================== -->
+<div class="tab-pane" id="pane-tab-students-roster" {% if tab != 'students_roster' %}style="display: none;"{% endif %}>
+    <div class="card-classic">
+        <div class="card-classic-header">
+            <div>
+                <i class="fa-solid fa-users"></i> 各課程修課學生名冊與選課人數統計
+            </div>
+            <div style="font-size: 0.85rem; font-weight: normal; color: var(--text-muted);">
+                即時掌握選修修課人數與名單
+            </div>
+        </div>
+        <div class="card-classic-body" style="padding: 0;">
+            <table class="electives-table">
+                <thead>
+                    <tr>
+                        <th class="col-name">課程名稱</th>
+                        <th class="col-code">代碼</th>
+                        <th class="col-category">類別</th>
+                        <th class="col-toggle">選修開放</th>
+                        <th class="col-enrolled">修課人數 / 上限</th>
+                        <th>選修學生名單</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for course in all_courses %}
+                        <tr>
+                            <td><strong>{{ course.name }}</strong></td>
+                            <td><code>{{ course.code }}</code></td>
+                            <td class="col-category">
+                                <span class="badge-tag {% if course.category == 'REQUIRED' %}badge-required{% else %}badge-elective{% endif %}">
+                                    {{ course.get_category_display }}
+                                </span>
+                            </td>
+                            <td class="col-toggle">
+                                {% if course.is_open_for_enrollment %}
+                                    <span style="color: var(--success); font-weight: 600;"><i class="fa-solid fa-check"></i> 開放選修</span>
+                                {% else %}
+                                    <span style="color: #6c757d;"><i class="fa-solid fa-lock"></i> 未開放</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: center;">
+                                <strong>{{ course.current_enrolled_count }}</strong> / {{ course.max_students }} 人
+                            </td>
+                            <td>
+                                {% for enr in course.enrollments.all %}
+                                    <span class="badge-tag" style="background: #e9ecef; color: #333333; margin-right: 0.35rem;">
+                                        <i class="fa-solid fa-user"></i> {{ enr.user.first_name|default:enr.user.username }}
+                                    </span>
+                                {% empty %}
+                                    <span style="color: #adb5bd; font-size: 0.8rem;">尚未有學生選修</span>
+                                {% endfor %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+<!-- ==========================================
+     MODAL 1: 新增課程 Modal
+     ========================================== -->
+<div class="modal-overlay" id="addCourseModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-plus-circle"></i> 新增資管一甲課程</div>
+            <button type="button" class="modal-close" onclick="closeModal('addCourseModal')">&times;</button>
+        </div>
+        <form action="{% url 'pages:add_course' %}" method="POST">
+            {% csrf_token %}
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">課程代碼 (必填)</label>
+                        <input type="text" name="code" class="form-control" placeholder="例如: EL206, IM106" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">課程名稱 (必填)</label>
+                        <input type="text" name="name" class="form-control" placeholder="例如: 雲端運算應用" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">授課教師</label>
+                        <input type="text" name="teacher" class="form-control" placeholder="例如: 葉明貴" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">上課教室</label>
+                        <input type="text" name="classroom" class="form-control" placeholder="例如: 電708(承曦樓)" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">課程屬性</label>
+                        <select name="category" class="form-control">
+                            <option value="ELECTIVE" selected>選修課程 (Elective)</option>
+                            <option value="REQUIRED">必修課程 (Required)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">學分數</label>
+                        <input type="number" name="credits" class="form-control" value="2" min="1" max="6" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">上課星期</label>
+                        <select name="day_of_week" class="form-control">
+                            <option value="1">星期一</option>
+                            <option value="2">星期二</option>
+                            <option value="3">星期三</option>
+                            <option value="4">星期四</option>
+                            <option value="5" selected>星期五</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">節次區間</label>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <select name="start_period" class="form-control">
+                                <option value="1">第 1 節</option>
+                                <option value="2">第 2 節</option>
+                                <option value="3">第 3 節</option>
+                                <option value="4">第 4 節</option>
+                                <option value="5" selected>第 5 節</option>
+                                <option value="6">第 6 節</option>
+                                <option value="7">第 7 節</option>
+                                <option value="8">第 8 節</option>
+                                <option value="9">第 9 節</option>
+                            </select>
+                            <span>至</span>
+                            <select name="end_period" class="form-control">
+                                <option value="1">第 1 節</option>
+                                <option value="2">第 2 節</option>
+                                <option value="3">第 3 節</option>
+                                <option value="4">第 4 節</option>
+                                <option value="5">第 5 節</option>
+                                <option value="6" selected>第 6 節</option>
+                                <option value="7">第 7 節</option>
+                                <option value="8">第 8 節</option>
+                                <option value="9">第 9 節</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">修課人數上限</label>
+                        <input type="number" name="max_students" class="form-control" value="45" min="5" max="200">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">課程色系標籤</label>
+                        <select name="color_tag" class="form-control">
+                            <option value="blue">經典湛藍 (Blue)</option>
+                            <option value="emerald">清新翠綠 (Emerald)</option>
+                            <option value="indigo">典雅靛青 (Indigo)</option>
+                            <option value="rose">熱情玫瑰 (Rose)</option>
+                            <option value="amber">活潑琥珀 (Amber)</option>
+                            <option value="teal">質感松青 (Teal)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">課程大綱說明</label>
+                    <textarea name="description" class="form-control" rows="3" placeholder="請輸入本課程之教學目標與授課簡介..."></textarea>
+                </div>
+
+                <div style="margin-top: 0.5rem;">
+                    <label style="cursor: pointer; font-weight: 600;">
+                        <input type="checkbox" name="is_open_for_enrollment" id="addIsOpenCheck" checked style="margin-right: 0.35rem;">
+                        立即開放學生自主選修此課程
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('addCourseModal')">取消</button>
+                <button type="submit" class="btn btn-primary">確認新增</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- ==========================================
+     MODAL 2: 編輯課程 Modal
+     ========================================== -->
+<div class="modal-overlay" id="editCourseModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-pen-to-square"></i> 編輯課程資料</div>
+            <button type="button" class="modal-close" onclick="closeModal('editCourseModal')">&times;</button>
+        </div>
+        <form id="editCourseForm" method="POST">
+            {% csrf_token %}
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">課程代碼</label>
+                        <input type="text" id="editCode" class="form-control" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">課程名稱 (必填)</label>
+                        <input type="text" name="name" id="editName" class="form-control" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">授課教師</label>
+                        <input type="text" name="teacher" id="editTeacher" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">上課教室</label>
+                        <input type="text" name="classroom" id="editClassroom" class="form-control" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">課程屬性</label>
+                        <select name="category" id="editCategory" class="form-control">
+                            <option value="ELECTIVE">選修課程 (Elective)</option>
+                            <option value="REQUIRED">必修課程 (Required)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">學分數</label>
+                        <input type="number" name="credits" id="editCredits" class="form-control" min="1" max="6" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">上課星期</label>
+                        <select name="day_of_week" id="editDayOfWeek" class="form-control">
+                            <option value="1">星期一</option>
+                            <option value="2">星期二</option>
+                            <option value="3">星期三</option>
+                            <option value="4">星期四</option>
+                            <option value="5">星期五</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">節次區間</label>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <select name="start_period" id="editStartPeriod" class="form-control">
+                                <option value="1">第 1 節</option>
+                                <option value="2">第 2 節</option>
+                                <option value="3">第 3 節</option>
+                                <option value="4">第 4 節</option>
+                                <option value="5">第 5 節</option>
+                                <option value="6">第 6 節</option>
+                                <option value="7">第 7 節</option>
+                                <option value="8">第 8 節</option>
+                                <option value="9">第 9 節</option>
+                            </select>
+                            <span>至</span>
+                            <select name="end_period" id="editEndPeriod" class="form-control">
+                                <option value="1">第 1 節</option>
+                                <option value="2">第 2 節</option>
+                                <option value="3">第 3 節</option>
+                                <option value="4">第 4 節</option>
+                                <option value="5">第 5 節</option>
+                                <option value="6">第 6 節</option>
+                                <option value="7">第 7 節</option>
+                                <option value="8">第 8 節</option>
+                                <option value="9">第 9 節</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">修課人數上限</label>
+                        <input type="number" name="max_students" id="editMaxStudents" class="form-control" min="5" max="200">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">色系標籤</label>
+                        <select name="color_tag" id="editColorTag" class="form-control">
+                            <option value="blue">經典湛藍 (Blue)</option>
+                            <option value="emerald">清新翠綠 (Emerald)</option>
+                            <option value="indigo">典雅靛青 (Indigo)</option>
+                            <option value="rose">熱情玫瑰 (Rose)</option>
+                            <option value="amber">活潑琥珀 (Amber)</option>
+                            <option value="teal">質感松青 (Teal)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">課程大綱說明</label>
+                    <textarea name="description" id="editDescription" class="form-control" rows="3"></textarea>
+                </div>
+
+                <div style="margin-top: 0.5rem;">
+                    <label style="cursor: pointer; font-weight: 600;">
+                        <input type="checkbox" name="is_open_for_enrollment" id="editIsOpenCheck" style="margin-right: 0.35rem;">
+                        開放學生自主選修此課程
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editCourseModal')">取消</button>
+                <button type="submit" class="btn btn-primary">儲存變更</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- ==========================================
+     MODAL 3: 課表點擊課程詳情 Modal
+     ========================================== -->
+<div class="modal-overlay" id="courseDetailModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title" id="detailCourseTitle">課程詳細資訊</div>
+            <button type="button" class="modal-close" onclick="closeModal('courseDetailModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <span class="badge-tag badge-required" id="detailCategoryBadge">必修</span>
+                <span class="badge-tag" id="detailCodeBadge" style="background: #e9ecef; color: #333;">代碼</span>
+                <span class="badge-tag badge-open" id="detailOpenBadge">開放選修</span>
+            </div>
+
+            <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 4px; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.85rem; line-height: 1.8;">
+                <div>時段：<strong id="detailPeriod"></strong></div>
+                <div>學分：<strong id="detailCredits"></strong></div>
+                <div>授課教師：<strong id="detailTeacher"></strong></div>
+                <div>上課教室：<strong id="detailClassroom"></strong></div>
+            </div>
+
+            <h4 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.35rem; color: var(--univ-navy);">
+                課程教學大綱：
+            </h4>
+            <div id="detailDesc" style="font-size: 0.85rem; color: #555; line-height: 1.6; background: #ffffff; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 4px;">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('courseDetailModal')">關閉</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // 標籤頁切換
+    function switchTab(targetTabId) {
+        document.querySelectorAll('.portal-tab-item').forEach(link => {
+            if (link.getAttribute('data-tab') === targetTabId) {
+                link.classList.add('active');
+            } else {
+                link.classList.remove('active');
+            }
+        });
+
+        document.querySelectorAll('.tab-pane').forEach(pane => {
+            if (pane.id === 'pane-' + targetTabId) {
+                pane.style.display = 'block';
+            } else {
+                pane.style.display = 'none';
+            }
+        });
+    }
+
+    document.querySelectorAll('.portal-tab-item').forEach(link => {
+        link.addEventListener('click', function(e) {
+            const dataTab = this.getAttribute('data-tab');
+            if (dataTab) {
+                switchTab(dataTab);
+            }
+        });
+    });
+
+    // Modal 控制
+    function openModal(id) {
+        const modal = document.getElementById(id);
+        if (modal) modal.classList.add('active');
+    }
+
+    function closeModal(id) {
+        const modal = document.getElementById(id);
+        if (modal) modal.classList.remove('active');
+    }
+
+    window.addEventListener('click', function(e) {
+        if (e.target.classList.contains('modal-overlay')) {
+            e.target.classList.remove('active');
+        }
+    });
+
+    function openAddCourseModal() {
+        openModal('addCourseModal');
+    }
+
+    function openEditCourseModal(id, code, name, teacher, classroom, credits, category, day, startP, endP, isOpen, maxStudents, desc, color) {
+        const form = document.getElementById('editCourseForm');
+        form.action = `/manage/course/${id}/edit/`;
+
+        document.getElementById('editCode').value = code;
+        document.getElementById('editName').value = name;
+        document.getElementById('editTeacher').value = teacher;
+        document.getElementById('editClassroom').value = classroom;
+        document.getElementById('editCredits').value = credits;
+        document.getElementById('editCategory').value = category;
+        document.getElementById('editDayOfWeek').value = day;
+        document.getElementById('editStartPeriod').value = startP;
+        document.getElementById('editEndPeriod').value = endP;
+        document.getElementById('editIsOpenCheck').checked = (isOpen === 'True' || isOpen === 'true' || isOpen === true);
+        document.getElementById('editMaxStudents').value = maxStudents;
+        document.getElementById('editDescription').value = desc;
+        document.getElementById('editColorTag').value = color;
+
+        openModal('editCourseModal');
+    }
+
+    function openCourseDetailModal(name, code, teacher, classroom, credits, categoryStr, periodStr, desc, isOpen) {
+        document.getElementById('detailCourseTitle').innerText = name;
+        document.getElementById('detailCategoryBadge').innerText = categoryStr;
+        document.getElementById('detailCodeBadge').innerText = '課程代碼: ' + code;
+        document.getElementById('detailPeriod').innerText = periodStr;
+        document.getElementById('detailCredits').innerText = credits + ' 學分';
+        document.getElementById('detailTeacher').innerText = teacher;
+        document.getElementById('detailClassroom').innerText = classroom;
+        document.getElementById('detailDesc').innerText = desc || '暫無詳細課程大綱說明。';
+
+        const openBadge = document.getElementById('detailOpenBadge');
+        if (isOpen === 'True' || isOpen === 'true' || isOpen === true) {
+            openBadge.innerText = '開放選修';
+            openBadge.className = 'badge-tag badge-open';
+        } else {
+            openBadge.innerText = '未開放選修';
+            openBadge.className = 'badge-tag badge-closed';
+        }
+
+        openModal('courseDetailModal');
+    }
+
+    // 選修課程即時搜尋過濾
+    function filterElectiveRows() {
+        const query = document.getElementById('electiveSearchInput').value.toLowerCase().trim();
+        const rows = document.querySelectorAll('.elective-table-row');
+
+        rows.forEach(row => {
+            const name = row.getAttribute('data-name') || '';
+            const teacher = row.getAttribute('data-teacher') || '';
+            const code = row.getAttribute('data-code') || '';
+
+            if (name.includes(query) || teacher.includes(query) || code.includes(query)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+</script>
+{% endblock %}

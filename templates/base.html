@@ -1,0 +1,85 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}資訊管理學系 網路選課系統 (資管一甲){% endblock %}</title>
+    <!-- FontAwesome 6 Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- 2020 經典校務行政系統樣式 -->
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+    <!-- 頂部校務系統導航列 -->
+    <header class="navbar">
+        <div class="nav-container">
+            <a href="{% url 'pages:index' %}" class="nav-brand">
+                <span class="brand-badge">MIS 1A</span>
+                <span class="brand-title">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                    資訊管理學系 網路選課與課表系統 (資管一甲)
+                </span>
+            </a>
+
+            <!-- 右側使用者資訊與登出按鈕（依要求移除頂部直接切換身分按鈕，需透過 /login 驗證） -->
+            <div class="nav-user-panel">
+                {% if request.user.is_authenticated %}
+                    <div class="user-identity-box">
+                        {% if is_admin %}
+                            <i class="fa-solid fa-user-shield"></i>
+                            <span>教務處管理員 (<strong>{{ request.user.username }}</strong>)</span>
+                        {% else %}
+                            <i class="fa-solid fa-user"></i>
+                            <span>學生：<strong>{{ request.user.first_name|default:"張家豪" }}</strong> (資管一甲)</span>
+                        {% endif %}
+                    </div>
+                    <a href="{% url 'pages:logout' %}" class="btn-logout" title="登出系統">
+                        <i class="fa-solid fa-right-from-bracket"></i> 登出
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要內容區 -->
+    <main class="main-container">
+        <!-- 系統訊息通知 (Flash Messages) -->
+        {% if messages %}
+            <div class="messages-container" id="messages-container">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags|default:'info' }}">
+                        <span>
+                            {% if message.tags == 'success' %}
+                                <i class="fa-solid fa-circle-check" style="margin-right: 0.4rem;"></i>
+                            {% elif message.tags == 'error' %}
+                                <i class="fa-solid fa-circle-exclamation" style="margin-right: 0.4rem;"></i>
+                            {% elif message.tags == 'warning' %}
+                                <i class="fa-solid fa-triangle-exclamation" style="margin-right: 0.4rem;"></i>
+                            {% else %}
+                                <i class="fa-solid fa-circle-info" style="margin-right: 0.4rem;"></i>
+                            {% endif %}
+                            {{ message }}
+                        </span>
+                        <button type="button" class="alert-close" onclick="this.parentElement.remove();">&times;</button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- 頁尾 -->
+    <footer class="footer">
+        <p>國立大學 資訊管理學系 • 學生網路選課與課表系統 (資管一甲)</p>
+        <p style="margin-top: 0.25rem; color: #888888;">
+            系統帳號：學生 <strong>student</strong> (張家豪) / 教務管理員 <strong>admin</strong>
+        </p>
+    </footer>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

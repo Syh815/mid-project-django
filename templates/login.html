@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block title %}使用者登入 • 資訊管理學系 選課系統{% endblock %}
+
+{% block content %}
+<div style="max-width: 440px; margin: 3rem auto;">
+    <div class="card-classic" style="border-top: 4px solid var(--univ-navy); box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+        <div style="padding: 1.5rem 1.75rem 1rem; text-align: center; border-bottom: 1px solid var(--border-color);">
+            <div style="font-size: 2.2rem; color: var(--univ-navy); margin-bottom: 0.35rem;">
+                <i class="fa-solid fa-graduation-cap"></i>
+            </div>
+            <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--univ-navy);">資訊管理學系 選課系統</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">
+                資管一甲 課表查詢與選課維護平台
+            </p>
+        </div>
+
+        <div style="padding: 1.75rem;">
+            <!-- 登入表單 -->
+            <form action="{% url 'pages:login' %}" method="POST">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label class="form-label">
+                        <i class="fa-solid fa-user" style="color: #6c757d; margin-right: 0.25rem;"></i> 使用者帳號
+                    </label>
+                    <input type="text" name="username" id="loginUsername" class="form-control" placeholder="請輸入 student 或 admin" required autofocus>
+                </div>
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label class="form-label">
+                        <i class="fa-solid fa-lock" style="color: #6c757d; margin-right: 0.25rem;"></i> 登入密碼
+                    </label>
+                    <input type="password" name="password" id="loginPassword" class="form-control" placeholder="請輸入密碼 (預設密碼如提示)" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.6rem; font-size: 0.95rem;">
+                    <i class="fa-solid fa-right-to-bracket"></i> 登入系統
+                </button>
+            </form>
+
+            <!-- 帳號提示與快速代入輔助 -->
+            <div style="margin-top: 1.75rem; padding: 0.85rem; background: #f8fafc; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.8rem;">
+                <div style="font-weight: 700; color: #495057; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.35rem;">
+                    <i class="fa-solid fa-circle-info" style="color: var(--univ-blue);"></i> 系統預設測試帳號：
+                </div>
+                <div style="margin-bottom: 0.4rem; color: #333333;">
+                    • <strong>學生端</strong>：帳號 <code>student</code> / 密碼 <code>student123</code> (張家豪)
+                    <button type="button" class="btn btn-secondary" style="padding: 0.15rem 0.4rem; font-size: 0.725rem; float: right;" onclick="fillLogin('student', 'student123')">代入</button>
+                </div>
+                <div style="color: #333333; clear: both; padding-top: 0.35rem;">
+                    • <strong>管理員</strong>：帳號 <code>admin</code> / 密碼 <code>admin123</code>
+                    <button type="button" class="btn btn-secondary" style="padding: 0.15rem 0.4rem; font-size: 0.725rem; float: right;" onclick="fillLogin('admin', 'admin123')">代入</button>
+                </div>
+                <div style="clear: both;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function fillLogin(u, p) {
+        document.getElementById('loginUsername').value = u;
+        document.getElementById('loginPassword').value = p;
+        document.getElementById('loginUsername').focus();
+    }
+</script>
+{% endblock %}
