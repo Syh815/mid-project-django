@@ -337,6 +337,45 @@ body {
   margin-top: 0.15rem;
 }
 
+/* 固定午休時段 (12:00 ~ 13:30 固定不可變更) */
+.lunch-break-row {
+  background-color: #f8fafc;
+}
+
+.lunch-period-cell {
+  background-color: #e2e8f0 !important;
+  color: #1e293b !important;
+  font-weight: 700;
+  vertical-align: middle !important;
+}
+
+.lunch-break-cell {
+  background: #f1f5f9 !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+  padding: 0.65rem 1rem !important;
+  border-top: 1px dashed #cbd5e1 !important;
+  border-bottom: 1px dashed #cbd5e1 !important;
+}
+
+.lunch-tag {
+  display: inline-block;
+  background: #cbd5e1;
+  color: #1e293b;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 4px;
+  margin-right: 0.5rem;
+}
+
+.lunch-desc {
+  font-size: 0.825rem;
+  color: #475569;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
 /* 有課的儲存格：經典淡米黃底色 (#fffde7)，參考圖片二 */
 .course-cell-filled {
   background-color: var(--timetable-cell-bg) !important;

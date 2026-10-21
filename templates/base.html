@@ -5,6 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}資訊管理學系 網路選課系統 (資管一甲){% endblock %}</title>
+    <!-- 網站預覽圖片與 Favicon -->
+    <link rel="icon" type="image/webp" href="{% static 'image/preview.webp' %}">
+    <meta property="og:title" content="資訊管理學系 網路選課與課表系統 (資管一甲)">
+    <meta property="og:description" content="國立大學 資訊管理學系 學生網路選課與課表系統">
+    <meta property="og:image" content="{% static 'image/preview.webp' %}">
     <!-- FontAwesome 6 Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <!-- 2020 經典校務行政系統樣式 -->
@@ -137,6 +142,35 @@ body {
 
 .btn-logout:hover {
   background: #bb2d3b;
+}
+
+.btn-settings {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  padding: 0.3rem 0.65rem;
+  font-size: 0.825rem;
+  border-radius: 4px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-settings:hover {
+  background: rgba(255, 255, 255, 0.28);
+  border-color: #ffffff;
+  color: #ffffff;
+}
+
+.user-avatar-nav {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid #ffffff;
+  vertical-align: middle;
 }
 
 /* 主要版面容器 */
@@ -347,6 +381,45 @@ body {
   font-size: 0.75rem;
   color: #555555;
   margin-top: 0.15rem;
+}
+
+/* 固定午休時段 (12:00 ~ 13:30 固定不可變更) */
+.lunch-break-row {
+  background-color: #f8fafc;
+}
+
+.lunch-period-cell {
+  background-color: #e2e8f0 !important;
+  color: #1e293b !important;
+  font-weight: 700;
+  vertical-align: middle !important;
+}
+
+.lunch-break-cell {
+  background: #f1f5f9 !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+  padding: 0.65rem 1rem !important;
+  border-top: 1px dashed #cbd5e1 !important;
+  border-bottom: 1px dashed #cbd5e1 !important;
+}
+
+.lunch-tag {
+  display: inline-block;
+  background: #cbd5e1;
+  color: #1e293b;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 4px;
+  margin-right: 0.5rem;
+}
+
+.lunch-desc {
+  font-size: 0.825rem;
+  color: #475569;
+  font-weight: 600;
+  letter-spacing: 0.5px;
 }
 
 /* 有課的儲存格：經典淡米黃底色 (#fffde7)，參考圖片二 */
@@ -745,18 +818,20 @@ body {
                 </span>
             </a>
 
-            <!-- 右側使用者資訊與登出按鈕（依要求移除頂部直接切換身分按鈕，需透過 /login 驗證） -->
+            <!-- 右側使用者資訊、設定與登出按鈕 -->
             <div class="nav-user-panel">
                 {% if request.user.is_authenticated %}
                     <div class="user-identity-box">
+                        <img src="{{ request.user.profile.avatar_url }}" alt="頭像" class="user-avatar-nav">
                         {% if is_admin %}
-                            <i class="fa-solid fa-user-shield"></i>
-                            <span>教務處管理員 (<strong>{{ request.user.username }}</strong>)</span>
+                            <span><strong>{{ request.user.first_name|default:request.user.username }}</strong> (教務處管理員)</span>
                         {% else %}
-                            <i class="fa-solid fa-user"></i>
-                            <span>學生：<strong>{{ request.user.first_name|default:"張家豪" }}</strong> (資管一甲)</span>
+                            <span><strong>{{ request.user.first_name|default:"張家豪" }}</strong> (資管一甲)</span>
                         {% endif %}
                     </div>
+                    <a href="{% url 'pages:profile_settings' %}" class="btn-settings" title="個人設定">
+                        <i class="fa-solid fa-gear"></i> 個人設定
+                    </a>
                     <a href="{% url 'pages:logout' %}" class="btn-logout" title="登出系統">
                         <i class="fa-solid fa-right-from-bracket"></i> 登出
                     </a>
@@ -797,7 +872,7 @@ body {
     <footer class="footer">
         <p>國立大學 資訊管理學系 • 學生網路選課與課表系統 (資管一甲)</p>
         <p style="margin-top: 0.25rem; color: #888888;">
-            系統帳號：學生 <strong>student</strong> (張家豪) / 教務管理員 <strong>admin</strong>
+            版權所有 &copy; 資訊管理學系 • 校務資訊整合系統
         </p>
     </footer>
 

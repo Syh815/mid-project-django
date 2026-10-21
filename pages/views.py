@@ -1,13 +1,13 @@
 import json
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, logout, authenticate
+from django.contrib.auth import login, logout, authenticate, update_session_auth_hash
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.http import require_POST
 
-from .models import Course, Enrollment
+from .models import Course, Enrollment, UserProfile
 from .utils import init_demo_data
 
 # 依據圖片第二張完整時段排程
@@ -365,3 +365,54 @@ def reset_database(request):
     init_demo_data()
     messages.success(request, "已成功重置為資管一甲標準課表！")
     return redirect('/?tab=admin_courses')
+
+
+@login_required
+def profile_settings(request):
+    """使用者個人設定：修改姓名、上傳頭像、重設密碼（需輸入兩次確認）"""
+    user = request.user
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    is_admin = user.is_staff or user.username == 'admin'
+
+    if request.method == 'POST':
+        name = request.POST.get('first_name', '').strip()
+        new_password = request.POST.get('new_password', '').strip()
+        confirm_password = request.POST.get('confirm_password', '').strip()
+        avatar_file = request.FILES.get('avatar')
+
+        # 1. 姓名更新
+        if name:
+            user.first_name = name
+            user.save()
+
+        # 2. 頭像更新
+        if avatar_file:
+            profile.avatar = avatar_file
+            profile.save()
+
+        # 3. 密碼更新 (若有填寫任一欄位)
+        password_changed = False
+        if new_password or confirm_password:
+            if not new_password:
+                messages.error(request, "設定失敗：請輸入新密碼！")
+                return render(request, 'profile_settings.html', {'profile': profile, 'is_admin': is_admin})
+            if new_password != confirm_password:
+                messages.error(request, "設定失敗：兩次輸入的密碼不相符，請重新確認！")
+                return render(request, 'profile_settings.html', {'profile': profile, 'is_admin': is_admin})
+            if len(new_password) < 4:
+                messages.error(request, "設定失敗：新密碼長度至少需 4 個字元以上！")
+                return render(request, 'profile_settings.html', {'profile': profile, 'is_admin': is_admin})
+
+            user.set_password(new_password)
+            user.save()
+            update_session_auth_hash(request, user)
+            password_changed = True
+
+        if password_changed:
+            messages.success(request, "個人資料與登入密碼已成功更新！")
+        else:
+            messages.success(request, "個人設定已成功更新！")
+
+        return redirect('pages:profile_settings')
+
+    return render(request, 'profile_settings.html', {'profile': profile, 'is_admin': is_admin})

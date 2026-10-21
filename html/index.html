@@ -10,14 +10,14 @@
             {% if is_admin %}
                 <i class="fa-solid fa-screwdriver-wrench" style="color: var(--univ-navy);"></i> 資管一甲 • 教務課程維護管理
             {% else %}
-                <i class="fa-solid fa-address-card" style="color: var(--univ-navy);"></i> 資管一甲 • 學生選課系統 (張家豪)
+                <i class="fa-solid fa-address-card" style="color: var(--univ-navy);"></i> 資管一甲 • 學生選課系統 ({{ request.user.first_name|default:"張家豪" }})
             {% endif %}
         </div>
         <div class="info-desc">
             {% if is_admin %}
                 您正在以<strong>【教務處管理員 (admin)】</strong>身份操作。您可檢視與調整資管一甲所有的課程資料、上課節次與教室，並隨時<strong>切換各課程是否開放學生選修</strong>。
             {% else %}
-                學生姓名：<strong>張家豪</strong> ｜ 學號：<strong>B11305001</strong> ｜ 班級：<strong>資管一甲</strong>。以下為您本學期標準課表，您可於「額外選修加選區」自主加退選課程。
+                學生姓名：<strong>{{ request.user.first_name|default:"張家豪" }}</strong> ｜ 學號：<strong>B11305001</strong> ｜ 班級：<strong>資管一甲</strong>。以下為您本學期標準課表，您可於「額外選修加選區」自主加退選課程。
             {% endif %}
         </div>
     </div>
@@ -90,7 +90,7 @@
             <div>
                 <strong style="font-size: 1.05rem; color: var(--univ-navy);">
                     <i class="fa-solid fa-table-cells"></i>
-                    {% if not is_admin %}資管一甲 • 學生個人本學期每週課表 (張家豪){% else %}資管一甲 • 全班標準每週課表總覽{% endif %}
+                    {% if not is_admin %}資管一甲 • 學生個人本學期每週課表 ({{ request.user.first_name|default:"張家豪" }}){% else %}資管一甲 • 全班標準每週課表總覽{% endif %}
                 </strong>
             </div>
             <div style="font-size: 0.85rem; display: flex; gap: 0.75rem; align-items: center;">
@@ -112,6 +112,19 @@
                 </thead>
                 <tbody>
                     {% for p in period_info %}
+                        {% if p.period == 5 %}
+                        <!-- 固定不可變更之午休時段 (12:00 ~ 13:30) -->
+                        <tr class="lunch-break-row">
+                            <td class="period-cell lunch-period-cell">
+                                <div class="period-name"><i class="fa-solid fa-utensils"></i> 午休</div>
+                                <div class="period-time-range">12:00 - 13:30</div>
+                            </td>
+                            <td colspan="5" class="lunch-break-cell">
+                                <span class="lunch-tag"><i class="fa-solid fa-clock"></i> 中午午休時段</span>
+                                <span class="lunch-desc">12:00 ~ 13:30（固定時段 • 不可排課）</span>
+                            </td>
+                        </tr>
+                        {% endif %}
                         <tr>
                             <!-- 節次與時間欄 (灰底，如圖二) -->
                             <td class="period-cell">

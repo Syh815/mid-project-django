@@ -8,4 +8,5 @@ urlpatterns = [
     path('', include('pages.urls')),
     # 強制支援靜態資源服務（即使透過反向代理或 Tunnel 訪問也能正確提供）
     re_path(r'^static/(?P<path>.*)$', serve, {'document_root': settings.BASE_DIR / 'html'}),
+    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ]

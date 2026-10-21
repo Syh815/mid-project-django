@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}使用者設定 • 資訊管理學系 選課系統{% endblock %}
+
+{% block content %}
+<div style="max-width: 680px; margin: 1.5rem auto;">
+    <div class="card-classic" style="border-top: 4px solid var(--univ-navy); box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
+        <!-- 卡片標題 -->
+        <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+                <i class="fa-solid fa-user-gear" style="font-size: 1.3rem; color: var(--univ-navy);"></i>
+                <h2 style="font-size: 1.2rem; font-weight: 700; color: var(--univ-navy); margin: 0;">使用者設定與個人檔案</h2>
+            </div>
+            <a href="{% url 'pages:index' %}" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.35rem 0.75rem;">
+                <i class="fa-solid fa-arrow-left"></i> 返回課表
+            </a>
+        </div>
+
+        <form action="{% url 'pages:profile_settings' %}" method="POST" enctype="multipart/form-data" id="profileForm" style="padding: 1.5rem;">
+            {% csrf_token %}
+
+            <!-- 頭像區塊 -->
+            <div style="display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1.75rem; padding-bottom: 1.5rem; border-bottom: 1px dashed var(--border-color);">
+                <div style="position: relative; text-align: center;">
+                    <img id="avatarPreview" src="{{ profile.avatar_url }}" alt="目前頭像" 
+                         style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 3px solid #dee2e6; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
+                </div>
+                <div style="flex: 1;">
+                    <label class="form-label" style="font-weight: 700;">
+                        <i class="fa-solid fa-image"></i> 更換個人頭像
+                    </label>
+                    <input type="file" name="avatar" id="avatarInput" accept="image/*" class="form-control" style="font-size: 0.85rem;" onchange="previewSelectedAvatar(this)">
+                    <small style="color: var(--text-muted); display: block; margin-top: 0.35rem;">
+                        支援 WEBP、PNG、JPG 圖片格式。上傳後將即時套用於系統各處。
+                    </small>
+                </div>
+            </div>
+
+            <!-- 基本資訊區塊 -->
+            <div style="margin-bottom: 1.5rem;">
+                <div style="font-weight: 700; color: #495057; margin-bottom: 1rem; font-size: 0.95rem; border-left: 3px solid var(--univ-blue); padding-left: 0.5rem;">
+                    基本資料
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fa-solid fa-id-badge" style="color: #6c757d;"></i> 使用者帳號 (固定)
+                        </label>
+                        <input type="text" class="form-control" value="{{ request.user.username }}" disabled style="background-color: #f1f3f5; cursor: not-allowed; font-weight: 600;">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fa-solid fa-user-tag" style="color: #6c757d;"></i> 使用者姓名 <span style="color: red;">*</span>
+                        </label>
+                        <input type="text" name="first_name" class="form-control" value="{{ request.user.first_name }}" placeholder="請輸入姓名" required>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 密碼修改區塊 -->
+            <div style="margin-bottom: 1.5rem; background: #fdfefe; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1.25rem;">
+                <div style="font-weight: 700; color: #2d3748; margin-bottom: 0.5rem; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between;">
+                    <span>
+                        <i class="fa-solid fa-shield-halved" style="color: var(--univ-navy);"></i> 變更登入密碼
+                    </span>
+                    <span style="font-size: 0.75rem; color: #718096; font-weight: normal;">
+                        （若維持現有密碼，此處兩欄請保持空白即可）
+                    </span>
+                </div>
+                <div style="font-size: 0.8rem; color: #4a5568; margin-bottom: 1rem;">
+                    依安全防護規範，密碼設定時<strong>需輸入兩次</strong>以確保無打錯。
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fa-solid fa-key" style="color: #6c757d;"></i> 輸入新密碼
+                        </label>
+                        <input type="password" name="new_password" id="newPassword" class="form-control" placeholder="請輸入新密碼 (至少4位)" oninput="checkPasswordMatch()">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fa-solid fa-check-double" style="color: #6c757d;"></i> 再次確認新密碼 <span style="color: red;">*</span>
+                        </label>
+                        <input type="password" name="confirm_password" id="confirmPassword" class="form-control" placeholder="請再次輸入新密碼" oninput="checkPasswordMatch()">
+                    </div>
+                </div>
+
+                <div id="passwordMatchMsg" style="font-size: 0.825rem; margin-top: 0.4rem; display: none;"></div>
+            </div>
+
+            <!-- 操作按鈕列 -->
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; padding-top: 0.5rem;">
+                <a href="{% url 'pages:index' %}" class="btn btn-secondary" style="padding: 0.55rem 1.25rem;">
+                    取消
+                </a>
+                <button type="submit" class="btn btn-primary" style="padding: 0.55rem 1.5rem; font-weight: 600;">
+                    <i class="fa-solid fa-floppy-disk"></i> 儲存所有設定
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function previewSelectedAvatar(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('avatarPreview').src = e.target.result;
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function checkPasswordMatch() {
+        const p1 = document.getElementById('newPassword').value;
+        const p2 = document.getElementById('confirmPassword').value;
+        const msg = document.getElementById('passwordMatchMsg');
+
+        if (!p1 && !p2) {
+            msg.style.display = 'none';
+            return;
+        }
+
+        msg.style.display = 'block';
+        if (p1 === p2) {
+            msg.style.color = '#198754';
+            msg.innerHTML = '<i class="fa-solid fa-circle-check"></i> 兩次輸入的密碼相符！';
+        } else {
+            msg.style.color = '#dc3545';
+            msg.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> 兩次輸入的密碼不相符，請確認！';
+        }
+    }
+
+    document.getElementById('profileForm').addEventListener('submit', function(e) {
+        const p1 = document.getElementById('newPassword').value;
+        const p2 = document.getElementById('confirmPassword').value;
+        if (p1 || p2) {
+            if (p1 !== p2) {
+                e.preventDefault();
+                alert('【設定未完成】兩次輸入的密碼不相符，請重新確認！');
+                document.getElementById('confirmPassword').focus();
+            }
+        }
+    });
+</script>
+{% endblock %}

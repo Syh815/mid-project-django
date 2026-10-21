@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 class Course(models.Model):
     CATEGORY_CHOICES = [
@@ -65,3 +67,30 @@ class Enrollment(models.Model):
 
     def __str__(self):
         return f"{self.user.username} -> {self.course.name}"
+
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile', verbose_name="使用者帳號")
+    avatar = models.FileField(upload_to='avatars/', blank=True, null=True, verbose_name="個人頭像")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="最後更新時間")
+
+    class Meta:
+        verbose_name = "個人設定"
+        verbose_name_plural = "個人設定列表"
+
+    def __str__(self):
+        return f"{self.user.username} 的個人檔案"
+
+    @property
+    def avatar_url(self):
+        if self.avatar:
+            try:
+                return self.avatar.url
+            except Exception:
+                pass
+        return '/static/image/preview.webp'
+
+
+@receiver(post_save, sender=User)
+def create_or_save_user_profile(sender, instance, created, **kwargs):
+    UserProfile.objects.get_or_create(user=instance)
