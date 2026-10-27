@@ -40,7 +40,7 @@ def check_time_conflict(course_a, course_b):
     return max(course_a.start_period, course_b.start_period) <= min(course_a.end_period, course_b.end_period)
 
 
-def index(request):
+def index(request, tab=None):
     """選課系統首頁 / 課表與維護入口"""
     # 確保基本示範資料存在
     if not User.objects.filter(username__in=['admin', 'student']).exists() or not Course.objects.exists():
@@ -51,6 +51,21 @@ def index(request):
         return redirect('pages:login')
 
     is_admin = request.user.is_staff or request.user.username == 'admin'
+
+    # 若使用舊式 query string ?tab=...，自動 302 重新導向至乾淨語意化目錄路徑 (Clean Directory URLs)
+    query_tab = request.GET.get('tab')
+    if query_tab:
+        tab_redirect_map = {
+            'enrolled': 'pages:enrolled',
+            'electives': 'pages:electives',
+            'timetable': 'pages:timetable',
+            'admin_courses': 'pages:manage_courses',
+            'students_roster': 'pages:students_roster',
+        }
+        if query_tab in tab_redirect_map:
+            return redirect(tab_redirect_map[query_tab])
+
+    active_tab = tab or ('admin_courses' if is_admin else 'timetable')
 
     # 取得所有課程與選課紀錄
     all_courses = Course.objects.all().prefetch_related('enrollments')
@@ -139,7 +154,7 @@ def index(request):
         'total_courses_count': total_courses_count,
         'open_courses_count': open_courses_count,
         'teachers_list': teachers_list,
-        'tab': request.GET.get('tab', 'timetable' if not is_admin else 'admin_courses'),
+        'tab': active_tab,
     }
     return render(request, 'index.html', context)
 
@@ -159,9 +174,9 @@ def login_view(request):
             display_name = user.first_name if user.first_name else user.username
             messages.success(request, f"登入成功！歡迎 {display_name} 進入系統。")
             if user.is_staff or user.username == 'admin':
-                return redirect('/?tab=admin_courses')
+                return redirect('pages:manage_courses')
             else:
-                return redirect('/?tab=timetable')
+                return redirect('pages:timetable')
         else:
             messages.error(request, "帳號或密碼輸入錯誤，請重新登入！(學生: student / student123；管理員: admin / admin123)")
 
@@ -184,17 +199,17 @@ def enroll_course(request, course_id):
     # 檢查是否開放選修
     if not course.is_open_for_enrollment:
         messages.error(request, f"選課失敗：【{course.name}】目前教務端未開放學生選修！")
-        return redirect('/?tab=electives')
+        return redirect('pages:electives')
 
     # 檢查是否已經選修
     if Enrollment.objects.filter(user=request.user, course=course).exists():
         messages.warning(request, f"您已經選修過【{course.name}】囉！")
-        return redirect('/?tab=electives')
+        return redirect('pages:electives')
 
     # 檢查人數上限
     if course.current_enrolled_count >= course.max_students:
         messages.error(request, f"選課失敗：【{course.name}】修課人數已額滿（上限 {course.max_students} 人）！")
-        return redirect('/?tab=electives')
+        return redirect('pages:electives')
 
     # 檢查時間衝突 (衝堂)
     current_enrolled = [e.course for e in Enrollment.objects.filter(user=request.user).select_related('course')]
@@ -204,12 +219,12 @@ def enroll_course(request, course_id):
                 request,
                 f"選課失敗：【{course.name}】（{course.period_display}）與您已選的【{ec.name}】（{ec.period_display}）時段衝突！"
             )
-            return redirect('/?tab=electives')
+            return redirect('pages:electives')
 
     # 建立選課紀錄
     Enrollment.objects.create(user=request.user, course=course)
     messages.success(request, f"成功加選【{course.name}】（{course.credits} 學分），已排入您的週課表！")
-    return redirect('/?tab=timetable')
+    return redirect('pages:timetable')
 
 
 @login_required
@@ -221,7 +236,7 @@ def drop_course(request, course_id):
     # 限制必修課不可由學生自行退選
     if course.category == 'REQUIRED':
         messages.error(request, f"退選失敗：【{course.name}】為資管一甲班級必修課程，學生端無法退選！")
-        return redirect('pages:index')
+        return redirect('pages:timetable')
 
     enrollment = Enrollment.objects.filter(user=request.user, course=course).first()
     if enrollment:
@@ -230,7 +245,10 @@ def drop_course(request, course_id):
     else:
         messages.warning(request, f"您尚未選修【{course.name}】。")
 
-    return redirect(request.POST.get('next', '/?tab=timetable'))
+    next_url = request.POST.get('next')
+    if next_url:
+        return redirect(next_url)
+    return redirect('pages:timetable')
 
 
 @login_required
@@ -247,7 +265,7 @@ def toggle_course_status(request, course_id):
     status_str = "【開放學生選修】" if course.is_open_for_enrollment else "【未開放選修】"
     messages.success(request, f"已更新課程【{course.name}】狀態為：{status_str}")
 
-    return redirect('/?tab=admin_courses')
+    return redirect('pages:manage_courses')
 
 
 @login_required
@@ -273,15 +291,15 @@ def add_course(request):
 
     if not code or not name:
         messages.error(request, "新增失敗：課程代碼與名稱為必填項目！")
-        return redirect('/?tab=admin_courses')
+        return redirect('pages:manage_courses')
 
     if end_period < start_period:
         messages.error(request, "新增失敗：結束節次不能小於開始節次！")
-        return redirect('/?tab=admin_courses')
+        return redirect('pages:manage_courses')
 
     if Course.objects.filter(code=code).exists():
         messages.error(request, f"新增失敗：課程代碼【{code}】已存在！")
-        return redirect('/?tab=admin_courses')
+        return redirect('pages:manage_courses')
 
     Course.objects.create(
         code=code,
@@ -300,7 +318,7 @@ def add_course(request):
     )
 
     messages.success(request, f"成功新增課程：【{name}】（代碼: {code}）！")
-    return redirect('/?tab=admin_courses')
+    return redirect('pages:manage_courses')
 
 
 @login_required
@@ -327,11 +345,11 @@ def edit_course(request, course_id):
 
     if not name:
         messages.error(request, "編輯失敗：課程名稱不能為空！")
-        return redirect('/?tab=admin_courses')
+        return redirect('pages:manage_courses')
 
     if end_period < start_period:
         messages.error(request, "編輯失敗：結束節次不能小於開始節次！")
-        return redirect('/?tab=admin_courses')
+        return redirect('pages:manage_courses')
 
     course.name = name
     course.teacher = teacher or course.teacher
@@ -348,7 +366,7 @@ def edit_course(request, course_id):
     course.save()
 
     messages.success(request, f"已成功更新課程【{course.name}】的資料與時段！")
-    return redirect('/?tab=admin_courses')
+    return redirect('pages:manage_courses')
 
 
 @login_required
@@ -362,7 +380,7 @@ def delete_course(request, course_id):
     cname = course.name
     course.delete()
     messages.success(request, f"課程【{cname}】已成功刪除。")
-    return redirect('/?tab=admin_courses')
+    return redirect('pages:manage_courses')
 
 
 @login_required
@@ -374,7 +392,7 @@ def reset_database(request):
 
     init_demo_data()
     messages.success(request, "已成功重置為資管一甲標準課表！")
-    return redirect('/?tab=admin_courses')
+    return redirect('pages:manage_courses')
 
 
 @login_required

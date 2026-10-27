@@ -1,6 +1,6 @@
-# 🎓 國立大學 資管一甲 網路選課與動態課表系統
+#  國立大學 資管一甲 網路選課與動態課表系統
 
-> ⚠️ **嚴正聲明 (Solemn Disclaimer)**  
+>  **嚴正聲明 (Solemn Disclaimer)**  
 > *This project was (definitely) NOT created by Gemini and Antigravity.*  
 > 　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　—— by **SYH**
 
@@ -10,7 +10,7 @@
 
 ---
 
-## 📌 目錄 (Table of Contents)
+##  目錄 (Table of Contents)
 
 1. [專案亮點與核心特色](#-專案亮點與核心特色)
 2. [預設帳號與權限說明](#-預設帳號與權限說明)
@@ -50,6 +50,17 @@
 - **自訂頭像上傳**：支援頭像檔案上傳、即時圖片預覽與安全儲存（`media/avatars/`）。
 - **帳號密碼維護**：提供密碼變更功能，並使用 Django 安全雜湊機制 (`update_session_auth_hash`)。
 
+### 6. 語意化目錄路徑與階層導航 (Clean Semantic Directory & Breadcrumb)
+- **告別醜陋查詢參數**：全面淘汰 `?tab=enrolled` 舊式 query string，改採直覺優雅的目錄結構：
+  - `/timetable/`：我的週課表
+  - `/electives/`：額外選修加選區
+  - `/enrolled/`：已選課程明細
+  - `/manage/courses/`：全系課程維護與選修開關
+  - `/manage/students/`：學生選課名冊統計
+- **無刷新 SPA 體驗 (HTML5 History API)**：切換頁籤即時切換內容，網址列無延遲平滑同步，完整支援瀏覽器上一頁/下一頁。
+- **經典校務階層麵包屑**：頂部明確標示「目前目錄位置：首頁 ❯ 學生網路選課 ❯ 已選課程明細」及語意化目錄徽章。
+- **完全向下相容**：造訪舊式 `/?tab=enrolled` 時自動 302 重導向至 `/enrolled/`，兼顧書籤相容性。
+
 ---
 
 ##  預設帳號與權限說明
@@ -81,7 +92,7 @@
 - **英語會話(二)(上)與實習**（顏嬿真 老師｜週四 5~6 節｜藝406）
 - **英文(三)(上)**（王嬿惠 老師｜週五 2~4 節｜藝406）
 
-###  熱門選修課程
+###  熱門選修課程 (預設)
 - **Linux基礎教學**（葉明貴 老師｜週五 5~6 節｜電708 承曦樓）
 - **基礎日文(一)**（良本蕙莉 老師｜週四 7~8 節｜藝406）
 - **多媒體導論**（郭怡君 老師｜週二 8~9 節｜電708 承曦樓）
@@ -112,7 +123,7 @@ graph TD
 
 ##  快速開始指南
 
-### 方法一：Windows 一鍵批次檔（最簡單）
+### 方法一：Windows 一鍵批次檔
 
 - **啟動伺服器**：雙擊根目錄的 [`start_server.bat`](file:///c:/UsersXXX/django_lab/start_server.bat)
   - 終端機將自動調用虛擬環境並綁定 `0.0.0.0:8000`
@@ -126,7 +137,7 @@ graph TD
 
 1. **進入專案目錄並啟用虛擬環境**：
    ```powershell
-   cd c:\Users\SYH\django_lab
+   cd c:\Users\XXX\django_lab
    .\.venv\Scripts\Activate.ps1
    ```
 

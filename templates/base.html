@@ -284,6 +284,97 @@ body {
   color: var(--text-muted);
 }
 
+/* 經典校務階層目錄導航 (Portal Breadcrumb) */
+.portal-breadcrumb {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.55rem 1rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.85rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.breadcrumb-container {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.breadcrumb-prefix {
+  color: var(--univ-navy);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.breadcrumb-list {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.breadcrumb-item {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+}
+
+.breadcrumb-item a {
+  color: var(--univ-blue);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: color 0.15s ease;
+}
+
+.breadcrumb-item a:hover {
+  color: var(--univ-navy);
+  text-decoration: underline;
+}
+
+.breadcrumb-separator {
+  color: #adb5bd;
+  font-size: 0.7rem;
+}
+
+.breadcrumb-item.active {
+  color: var(--univ-navy);
+  font-weight: 700;
+}
+
+.breadcrumb-url-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--univ-blue-light);
+  color: var(--univ-navy);
+  border: 1px solid #b6d4fe;
+  padding: 0.2rem 0.65rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.breadcrumb-url-badge code {
+  color: var(--univ-navy);
+  font-weight: 700;
+  background: transparent;
+  padding: 0;
+}
+
 /* 頁籤選單 (Classic Tabs) */
 .portal-tabs {
   display: flex;

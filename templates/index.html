@@ -55,26 +55,65 @@
     </div>
 </div>
 
+<!-- 經典校務階層目錄導航列 (Hierarchical Directory Breadcrumb) -->
+<nav class="portal-breadcrumb" aria-label="系統目錄階層">
+    <div class="breadcrumb-container">
+        <span class="breadcrumb-prefix"><i class="fa-solid fa-folder-tree"></i> 目前目錄位置：</span>
+        <ol class="breadcrumb-list">
+            <li class="breadcrumb-item">
+                <a href="{% url 'pages:index' %}"><i class="fa-solid fa-house"></i> 首頁</a>
+            </li>
+            <li class="breadcrumb-separator"><i class="fa-solid fa-angle-right"></i></li>
+            <li class="breadcrumb-item">
+                <span class="breadcrumb-category">
+                    {% if is_admin %}<i class="fa-solid fa-screwdriver-wrench"></i> 教務管理系統{% else %}<i class="fa-solid fa-book-open-reader"></i> 學生網路選課{% endif %}
+                </span>
+            </li>
+            <li class="breadcrumb-separator"><i class="fa-solid fa-angle-right"></i></li>
+            <li class="breadcrumb-item active" id="breadcrumbActiveItem">
+                <span id="breadcrumbCurrentText">
+                    {% if tab == 'timetable' %}
+                        {% if is_admin %}資管一甲標準課表總覽{% else %}我的週課表{% endif %}
+                    {% elif tab == 'electives' %}
+                        額外選修加選區
+                    {% elif tab == 'enrolled' %}
+                        已選課程明細
+                    {% elif tab == 'admin_courses' %}
+                        全系課程維護與選修開關
+                    {% elif tab == 'students_roster' %}
+                        學生選課名冊統計
+                    {% else %}
+                        課表與選課
+                    {% endif %}
+                </span>
+            </li>
+        </ol>
+    </div>
+    <div class="breadcrumb-url-badge" title="目前語意化目錄路徑">
+        <i class="fa-solid fa-link"></i> <code id="breadcrumbUrlPath">{% if tab == 'timetable' %}/timetable/{% elif tab == 'electives' %}/electives/{% elif tab == 'enrolled' %}/enrolled/{% elif tab == 'admin_courses' %}/manage/courses/{% elif tab == 'students_roster' %}/manage/students/{% else %}/timetable/{% endif %}</code>
+    </div>
+</nav>
+
 <!-- 系統功能選單頁籤 (Classic Tabs) -->
 <nav class="portal-tabs" id="portalTabNav">
     {% if not is_admin %}
-        <a href="?tab=timetable" class="portal-tab-item {% if tab == 'timetable' %}active{% endif %}" data-tab="tab-timetable">
+        <a href="{% url 'pages:timetable' %}" class="portal-tab-item {% if tab == 'timetable' %}active{% endif %}" data-tab="tab-timetable" data-url="{% url 'pages:timetable' %}" data-title="我的週課表" data-path="/timetable/">
             <i class="fa-regular fa-calendar-days"></i> 我的週課表
         </a>
-        <a href="?tab=electives" class="portal-tab-item {% if tab == 'electives' %}active{% endif %}" data-tab="tab-electives">
+        <a href="{% url 'pages:electives' %}" class="portal-tab-item {% if tab == 'electives' %}active{% endif %}" data-tab="tab-electives" data-url="{% url 'pages:electives' %}" data-title="額外選修加選區" data-path="/electives/">
             <i class="fa-solid fa-plus-circle"></i> 額外選修加選區
         </a>
-        <a href="?tab=enrolled" class="portal-tab-item {% if tab == 'enrolled' %}active{% endif %}" data-tab="tab-enrolled">
+        <a href="{% url 'pages:enrolled' %}" class="portal-tab-item {% if tab == 'enrolled' %}active{% endif %}" data-tab="tab-enrolled" data-url="{% url 'pages:enrolled' %}" data-title="已選課程明細" data-path="/enrolled/">
             <i class="fa-solid fa-list-check"></i> 已選課程明細
         </a>
     {% else %}
-        <a href="?tab=admin_courses" class="portal-tab-item {% if tab == 'admin_courses' %}active{% endif %}" data-tab="tab-admin-courses">
+        <a href="{% url 'pages:manage_courses' %}" class="portal-tab-item {% if tab == 'admin_courses' %}active{% endif %}" data-tab="tab-admin-courses" data-url="{% url 'pages:manage_courses' %}" data-title="全系課程維護與選修開關" data-path="/manage/courses/">
             <i class="fa-solid fa-list-check"></i> 全系課程維護與選修開關
         </a>
-        <a href="?tab=timetable" class="portal-tab-item {% if tab == 'timetable' %}active{% endif %}" data-tab="tab-timetable">
+        <a href="{% url 'pages:timetable' %}" class="portal-tab-item {% if tab == 'timetable' %}active{% endif %}" data-tab="tab-timetable" data-url="{% url 'pages:timetable' %}" data-title="資管一甲標準課表總覽" data-path="/timetable/">
             <i class="fa-solid fa-table"></i> 資管一甲標準課表總覽
         </a>
-        <a href="?tab=students_roster" class="portal-tab-item {% if tab == 'students_roster' %}active{% endif %}" data-tab="tab-students-roster">
+        <a href="{% url 'pages:students_roster' %}" class="portal-tab-item {% if tab == 'students_roster' %}active{% endif %}" data-tab="tab-students-roster" data-url="{% url 'pages:students_roster' %}" data-title="學生選課名冊統計" data-path="/manage/students/">
             <i class="fa-solid fa-users"></i> 學生選課名冊統計
         </a>
     {% endif %}
@@ -156,7 +195,7 @@
                                                             {% if not is_admin and cell.course.category == 'ELECTIVE' %}
                                                                 <form action="{% url 'pages:drop_course' cell.course.id %}" method="POST" onsubmit="return confirm('確定要退選【{{ cell.course.name }}】嗎？');">
                                                                     {% csrf_token %}
-                                                                    <input type="hidden" name="next" value="/?tab=timetable">
+                                                                    <input type="hidden" name="next" value="{% url 'pages:timetable' %}">
                                                                     <button type="submit" class="btn-timetable-drop" title="退選此課程">
                                                                         退選
                                                                     </button>
@@ -270,7 +309,7 @@
                                                 <span style="color: var(--success); font-size: 0.8rem; font-weight: 700;">已選修</span>
                                                 <form action="{% url 'pages:drop_course' item.course.id %}" method="POST" onsubmit="return confirm('確定要退選【{{ item.course.name }}】嗎？');">
                                                     {% csrf_token %}
-                                                    <input type="hidden" name="next" value="/?tab=electives">
+                                                    <input type="hidden" name="next" value="{% url 'pages:electives' %}">
                                                     <button type="submit" class="btn btn-outline-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
                                                         退選
                                                     </button>
@@ -358,7 +397,7 @@
                                 {% if course.category == 'ELECTIVE' %}
                                     <form action="{% url 'pages:drop_course' course.id %}" method="POST" onsubmit="return confirm('確定要退選【{{ course.name }}】嗎？');">
                                         {% csrf_token %}
-                                        <input type="hidden" name="next" value="/?tab=enrolled">
+                                        <input type="hidden" name="next" value="{% url 'pages:enrolled' %}">
                                         <button type="submit" class="btn btn-outline-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
                                             退選
                                         </button>
@@ -869,11 +908,13 @@
 
 {% block extra_scripts %}
 <script>
-    // 標籤頁切換
-    function switchTab(targetTabId) {
+    // 標籤頁切換與語意化目錄路徑同步 (Clean URL & History API)
+    function switchTab(targetTabId, updateHistory = true) {
+        let activeLink = null;
         document.querySelectorAll('.portal-tab-item').forEach(link => {
             if (link.getAttribute('data-tab') === targetTabId) {
                 link.classList.add('active');
+                activeLink = link;
             } else {
                 link.classList.remove('active');
             }
@@ -886,15 +927,60 @@
                 pane.style.display = 'none';
             }
         });
+
+        if (activeLink) {
+            const title = activeLink.getAttribute('data-title');
+            const path = activeLink.getAttribute('data-path') || activeLink.getAttribute('href');
+
+            // 動態更新麵包屑導航項目與語意化 URL 徽章
+            const breadcrumbText = document.getElementById('breadcrumbCurrentText');
+            if (breadcrumbText && title) {
+                breadcrumbText.textContent = title;
+            }
+            const breadcrumbUrl = document.getElementById('breadcrumbUrlPath');
+            if (breadcrumbUrl && path) {
+                breadcrumbUrl.textContent = path;
+            }
+
+            // 無刷新同步瀏覽器網址列 (如 /enrolled/、/electives/、/timetable/)
+            if (updateHistory && path && window.history.pushState) {
+                window.history.pushState({ tabId: targetTabId, path: path, title: title }, title, path);
+            }
+        }
     }
 
     document.querySelectorAll('.portal-tab-item').forEach(link => {
         link.addEventListener('click', function(e) {
+            e.preventDefault();
             const dataTab = this.getAttribute('data-tab');
             if (dataTab) {
-                switchTab(dataTab);
+                switchTab(dataTab, true);
             }
         });
+    });
+
+    // 支援瀏覽器上一頁與下一頁 (PopState)
+    window.addEventListener('popstate', function(e) {
+        if (e.state && e.state.tabId) {
+            switchTab(e.state.tabId, false);
+        } else {
+            const curPath = window.location.pathname;
+            let matched = false;
+            document.querySelectorAll('.portal-tab-item').forEach(link => {
+                const linkPath = link.getAttribute('data-path') || link.getAttribute('href');
+                if (linkPath === curPath) {
+                    const dataTab = link.getAttribute('data-tab');
+                    switchTab(dataTab, false);
+                    matched = true;
+                }
+            });
+            if (!matched) {
+                const defaultLink = document.querySelector('.portal-tab-item');
+                if (defaultLink) {
+                    switchTab(defaultLink.getAttribute('data-tab'), false);
+                }
+            }
+        }
     });
 
     // Modal 控制

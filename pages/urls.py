@@ -4,7 +4,20 @@ from . import views
 app_name = 'pages'
 
 urlpatterns = [
+    # 首頁與乾淨語意化目錄路徑 (Clean Semantic Directory URLs)
     path('', views.index, name='index'),
+    path('timetable/', views.index, {'tab': 'timetable'}, name='timetable'),
+    path('electives/', views.index, {'tab': 'electives'}, name='electives'),
+    path('enrolled/', views.index, {'tab': 'enrolled'}, name='enrolled'),
+
+    # 教務管理語意化目錄路徑
+    path('manage/courses/', views.index, {'tab': 'admin_courses'}, name='manage_courses'),
+    path('manage/students/', views.index, {'tab': 'students_roster'}, name='students_roster'),
+
+    # 快捷別名相容
+    path('admin-courses/', views.index, {'tab': 'admin_courses'}, name='admin_courses'),
+    path('students-roster/', views.index, {'tab': 'students_roster'}, name='students_roster_alias'),
+
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('settings/', views.profile_settings, name='profile_settings'),

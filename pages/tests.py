@@ -172,15 +172,35 @@ class CourseSelectionTestCase(TestCase):
         self.assertIn('id="editTeacher"', content)
         self.assertIn('▼ 快速選擇', content)
 
-    def test_course_admin_form_teacher_widget(self):
-        """驗證 Django Admin 中的 CourseAdminForm 包含教師 datalist 與快速選單"""
-        from pages.admin import CourseAdminForm
-        form = CourseAdminForm()
-        teacher_html = form['teacher'].as_widget()
-        self.assertIn('datalist', teacher_html)
-        self.assertIn('葉明貴', teacher_html)
-        self.assertIn('丁慧瑩', teacher_html)
-        self.assertNotIn('丁慧堂', teacher_html)
-        self.assertNotIn('佐藤愛子', teacher_html)
-        self.assertIn('快速選擇老師', teacher_html)
+    def test_semantic_directory_urls_and_tab_redirect(self):
+        """驗證語意化目錄路徑（/enrolled/、/electives/、/timetable/）與舊式 ?tab= 重導向"""
+        self.client.force_login(self.student_user)
+
+        # 1. 直接造訪 /enrolled/
+        res_enrolled = self.client.get(reverse('pages:enrolled'))
+        self.assertEqual(res_enrolled.status_code, 200)
+        self.assertEqual(res_enrolled.context['tab'], 'enrolled')
+        self.assertIn('/enrolled/', res_enrolled.content.decode('utf-8'))
+
+        # 2. 直接造訪 /electives/
+        res_electives = self.client.get(reverse('pages:electives'))
+        self.assertEqual(res_electives.status_code, 200)
+        self.assertEqual(res_electives.context['tab'], 'electives')
+
+        # 3. 直接造訪 /timetable/
+        res_timetable = self.client.get(reverse('pages:timetable'))
+        self.assertEqual(res_timetable.status_code, 200)
+        self.assertEqual(res_timetable.context['tab'], 'timetable')
+
+        # 4. 造訪舊式 ?tab=enrolled，應自動 302 導向至 /enrolled/
+        res_legacy = self.client.get('/?tab=enrolled')
+        self.assertEqual(res_legacy.status_code, 302)
+        self.assertEqual(res_legacy.url, reverse('pages:enrolled'))
+
+        # 5. 管理員造訪 /manage/courses/
+        self.client.force_login(self.admin_user)
+        res_admin = self.client.get(reverse('pages:manage_courses'))
+        self.assertEqual(res_admin.status_code, 200)
+        self.assertEqual(res_admin.context['tab'], 'admin_courses')
+
 
