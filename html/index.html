@@ -545,6 +545,13 @@
 {% endif %}
 
 
+<!-- 教師選單 datalist 供打字自動完成與下拉選取使用 -->
+<datalist id="teacherOptionsList">
+    {% for t in teachers_list %}
+    <option value="{{ t }}"></option>
+    {% endfor %}
+</datalist>
+
 <!-- ==========================================
      MODAL 1: 新增課程 Modal
      ========================================== -->
@@ -571,7 +578,18 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">授課教師</label>
-                        <input type="text" name="teacher" class="form-control" placeholder="例如: 葉明貴" required>
+                        <div style="display: flex; gap: 0.35rem; align-items: center;">
+                            <input type="text" name="teacher" id="addTeacherInput" list="teacherOptionsList" class="form-control" placeholder="打字輸入或由右側選擇" autocomplete="off" required>
+                            <select class="form-control" style="width: auto; min-width: 125px; flex-shrink: 0; background-color: #f8fafc; cursor: pointer; font-size: 0.825rem;" onchange="if(this.value){ document.getElementById('addTeacherInput').value = this.value; this.value=''; document.getElementById('addTeacherInput').focus(); }" title="點擊快速選擇教師">
+                                <option value="">▼ 快速選擇</option>
+                                {% for t in teachers_list %}
+                                <option value="{{ t }}">{{ t }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <small style="display: block; margin-top: 0.25rem; font-size: 0.75rem; color: #64748b;">
+                            <i class="fa-solid fa-circle-info"></i> 可直接打字輸入新老師，或從選單快速挑選
+                        </small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">上課教室</label>
@@ -699,7 +717,18 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">授課教師</label>
-                        <input type="text" name="teacher" id="editTeacher" class="form-control" required>
+                        <div style="display: flex; gap: 0.35rem; align-items: center;">
+                            <input type="text" name="teacher" id="editTeacher" list="teacherOptionsList" class="form-control" placeholder="打字輸入或由右側選擇" autocomplete="off" required>
+                            <select class="form-control" style="width: auto; min-width: 125px; flex-shrink: 0; background-color: #f8fafc; cursor: pointer; font-size: 0.825rem;" onchange="if(this.value){ document.getElementById('editTeacher').value = this.value; this.value=''; document.getElementById('editTeacher').focus(); }" title="點擊快速選擇教師">
+                                <option value="">▼ 快速選擇</option>
+                                {% for t in teachers_list %}
+                                <option value="{{ t }}">{{ t }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <small style="display: block; margin-top: 0.25rem; font-size: 0.75rem; color: #64748b;">
+                            <i class="fa-solid fa-circle-info"></i> 可直接打字修改，或從選單快速切換
+                        </small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">上課教室</label>
@@ -886,6 +915,8 @@
     });
 
     function openAddCourseModal() {
+        const tInput = document.getElementById('addTeacherInput');
+        if (tInput) tInput.value = '';
         openModal('addCourseModal');
     }
 

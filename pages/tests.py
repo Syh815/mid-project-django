@@ -153,3 +153,34 @@ class CourseSelectionTestCase(TestCase):
         self.assertEqual(c.name, '進階Linux雲端伺服器架設')
         self.assertEqual(c.credits, 3)
         self.assertEqual(c.end_period, 7)
+
+    def test_teachers_list_in_index_context(self):
+        """驗證管理員首頁提供教師名單供選取與自動補全"""
+        self.client.force_login(self.admin_user)
+        response = self.client.get(reverse('pages:index'))
+        self.assertEqual(response.status_code, 200)
+        teachers_list = response.context['teachers_list']
+        self.assertIn('葉明貴', teachers_list)
+        self.assertIn('黃燕萍', teachers_list)
+        self.assertIn('丁慧瑩', teachers_list)
+        self.assertNotIn('丁慧堂', teachers_list)
+        self.assertNotIn('佐藤愛子', teachers_list)
+        # 驗證模板中包含 teacherOptionsList datalist 與下拉選單
+        content = response.content.decode('utf-8')
+        self.assertIn('id="teacherOptionsList"', content)
+        self.assertIn('id="addTeacherInput"', content)
+        self.assertIn('id="editTeacher"', content)
+        self.assertIn('▼ 快速選擇', content)
+
+    def test_course_admin_form_teacher_widget(self):
+        """驗證 Django Admin 中的 CourseAdminForm 包含教師 datalist 與快速選單"""
+        from pages.admin import CourseAdminForm
+        form = CourseAdminForm()
+        teacher_html = form['teacher'].as_widget()
+        self.assertIn('datalist', teacher_html)
+        self.assertIn('葉明貴', teacher_html)
+        self.assertIn('丁慧瑩', teacher_html)
+        self.assertNotIn('丁慧堂', teacher_html)
+        self.assertNotIn('佐藤愛子', teacher_html)
+        self.assertIn('快速選擇老師', teacher_html)
+

@@ -89,7 +89,7 @@ def init_demo_data():
         {
             'code': 'IM104',
             'name': '系統分析與設計(上)與實習',
-            'teacher': '丁慧堂',
+            'teacher': '丁慧瑩',
             'classroom': '藝406',
             'credits': 3,
             'category': 'REQUIRED',
@@ -196,7 +196,7 @@ def init_demo_data():
         {
             'code': 'EL202',
             'name': '基礎日文(一)',
-            'teacher': '佐藤愛子',
+            'teacher': '良本蕙莉',
             'classroom': '藝406',
             'credits': 2,
             'category': 'ELECTIVE',

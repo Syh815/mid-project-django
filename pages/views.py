@@ -115,6 +115,15 @@ def index(request):
     total_courses_count = all_courses.count()
     open_courses_count = all_courses.filter(is_open_for_enrollment=True).count()
 
+    # 取得現有與預設所有教師名單（供新增/編輯課程時打字或下拉選擇）
+    default_teachers = [
+        '黃燕萍', '李俞麟', '唐日新', '林俊杰', '丁慧瑩',
+        '謝文欽', '陳秋良', '許佩玉', '顏嬿真', '王嬿惠',
+        '葉明貴', '郭怡君'
+    ]
+    db_teachers = list(Course.objects.values_list('teacher', flat=True).distinct())
+    teachers_list = sorted(list({t.strip() for t in (default_teachers + db_teachers) if t and t.strip()}))
+
     context = {
         'is_admin': is_admin,
         'period_info': PERIOD_INFO,
@@ -129,6 +138,7 @@ def index(request):
         'course_count': len(enrolled_courses),
         'total_courses_count': total_courses_count,
         'open_courses_count': open_courses_count,
+        'teachers_list': teachers_list,
         'tab': request.GET.get('tab', 'timetable' if not is_admin else 'admin_courses'),
     }
     return render(request, 'index.html', context)
