@@ -8,7 +8,7 @@ from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.http import require_POST
 
 from .models import Course, Enrollment, UserProfile
-from .utils import init_demo_data
+from .utils import init_demo_data, create_student_account
 
 # 依據圖片第二張完整時段排程
 PERIOD_INFO = [
@@ -139,6 +139,24 @@ def index(request, tab=None):
     db_teachers = list(Course.objects.values_list('teacher', flat=True).distinct())
     teachers_list = sorted(list({t.strip() for t in (default_teachers + db_teachers) if t and t.strip()}))
 
+    # 學生名冊（管理員端查看與管理資管一甲學生）
+    students_list = []
+    if is_admin:
+        students_query = User.objects.filter(is_staff=False).select_related('profile').prefetch_related('enrollments__course').order_by('username')
+        for stu in students_query:
+            enr_courses = [e.course for e in stu.enrollments.all()]
+            req_c = sum(c.credits for c in enr_courses if c.category == 'REQUIRED')
+            elec_c = sum(c.credits for c in enr_courses if c.category == 'ELECTIVE')
+            students_list.append({
+                'user': stu,
+                'profile': getattr(stu, 'profile', None),
+                'total_credits': req_c + elec_c,
+                'required_credits': req_c,
+                'elective_credits': elec_c,
+                'course_count': len(enr_courses),
+                'enrolled_courses': enr_courses,
+            })
+
     context = {
         'is_admin': is_admin,
         'period_info': PERIOD_INFO,
@@ -154,6 +172,7 @@ def index(request, tab=None):
         'total_courses_count': total_courses_count,
         'open_courses_count': open_courses_count,
         'teachers_list': teachers_list,
+        'students_list': students_list,
         'tab': active_tab,
     }
     return render(request, 'index.html', context)
@@ -408,10 +427,15 @@ def profile_settings(request):
         confirm_password = request.POST.get('confirm_password', '').strip()
         avatar_file = request.FILES.get('avatar')
 
-        # 1. 姓名更新
+        # 1. 姓名與性別更新
         if name:
             user.first_name = name
             user.save()
+
+        gender = request.POST.get('gender', '').strip()
+        if gender in ['M', 'F', 'O']:
+            profile.gender = gender
+            profile.save()
 
         # 2. 頭像更新
         if avatar_file:
@@ -444,3 +468,43 @@ def profile_settings(request):
         return redirect('pages:profile_settings')
 
     return render(request, 'profile_settings.html', {'profile': profile, 'is_admin': is_admin})
+
+
+@login_required
+@require_POST
+def add_student(request):
+    """教務管理員新增資管一甲學生帳號"""
+    if not (request.user.is_staff or request.user.username == 'admin'):
+        return HttpResponseForbidden("僅教務管理員可新增學生帳號。")
+
+    username = request.POST.get('username', '').strip()
+    name = request.POST.get('name', '').strip()
+    gender = request.POST.get('gender', 'M').strip()
+    if gender not in ['M', 'F', 'O']:
+        gender = 'M'
+    password = request.POST.get('password', '').strip() or 'student123'
+    student_id = request.POST.get('student_id', '').strip() or username
+
+    if not username or not name:
+        messages.error(request, "新增失敗：學生帳號與姓名為必填項目！")
+        return redirect('pages:students_roster')
+
+    if User.objects.filter(username=username).exists():
+        messages.error(request, f"新增失敗：帳號【{username}】已被使用，請更換帳號或學號！")
+        return redirect('pages:students_roster')
+
+    student_user = create_student_account(
+        username=username,
+        name=name,
+        gender=gender,
+        password=password,
+        student_id=student_id
+    )
+
+    gender_display = student_user.profile.get_gender_display()
+    messages.success(
+        request,
+        f"成功新增資管一甲學生：【{name}】（帳號: {username}，性別: {gender_display}）！預設密碼為 {password}，已自動預載資管一甲班級必修課表。"
+    )
+    return redirect('pages:students_roster')
+

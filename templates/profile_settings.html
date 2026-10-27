@@ -57,6 +57,24 @@
                         </label>
                         <input type="text" name="first_name" class="form-control" value="{{ request.user.first_name }}" placeholder="請輸入姓名" required>
                     </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fa-solid fa-venus-mars" style="color: #6c757d;"></i> 性別
+                        </label>
+                        <select name="gender" class="form-control" style="font-weight: 600;">
+                            <option value="M" {% if profile.gender == 'M' %}selected{% endif %}>男 (Male)</option>
+                            <option value="F" {% if profile.gender == 'F' %}selected{% endif %}>女 (Female)</option>
+                            <option value="O" {% if profile.gender == 'O' %}selected{% endif %}>其他 (Other)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fa-solid fa-graduation-cap" style="color: #6c757d;"></i> 所屬班級 (固定)
+                        </label>
+                        <input type="text" class="form-control" value="{{ profile.student_class|default:'資管一甲' }}" disabled style="background-color: #f1f3f5; cursor: not-allowed; font-weight: 600;">
+                    </div>
                 </div>
             </div>
 

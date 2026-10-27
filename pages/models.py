@@ -70,7 +70,16 @@ class Enrollment(models.Model):
 
 
 class UserProfile(models.Model):
+    GENDER_CHOICES = [
+        ('M', '男'),
+        ('F', '女'),
+        ('O', '其他'),
+    ]
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile', verbose_name="使用者帳號")
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, default='M', verbose_name="性別")
+    student_id = models.CharField(max_length=20, blank=True, default="", verbose_name="學號")
+    student_class = models.CharField(max_length=50, default="資管一甲", verbose_name="班級")
     avatar = models.FileField(upload_to='avatars/', blank=True, null=True, verbose_name="個人頭像")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="最後更新時間")
 

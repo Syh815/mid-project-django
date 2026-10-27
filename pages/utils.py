@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User
-from pages.models import Course, Enrollment
+from pages.models import Course, Enrollment, UserProfile
 
 def init_demo_data():
     """建立預設帳號與資管一甲課程示範資料（參考實際課表資訊）"""
@@ -11,13 +11,19 @@ def init_demo_data():
     admin_user.first_name = '教務處管理員'
     admin_user.save()
 
-    # 建立或更新 student 帳號，學生姓名設定為「張家豪」
+    # 建立或更新 student 帳號，學生姓名設定為「張家豪」（性別：男，班級：資管一甲）
     student_user, _ = User.objects.get_or_create(username='student')
     student_user.set_password('student123')
     student_user.is_staff = False
     student_user.is_superuser = False
     student_user.first_name = '張家豪'
     student_user.save()
+
+    student_profile, _ = UserProfile.objects.get_or_create(user=student_user)
+    student_profile.gender = 'M'  # 張家豪是男生
+    student_profile.student_id = 'B11305001'
+    student_profile.student_class = '資管一甲'
+    student_profile.save()
 
     # 清除舊課程資料以確保完全符合課表
     Enrollment.objects.all().delete()
@@ -264,3 +270,29 @@ def init_demo_data():
         Enrollment.objects.get_or_create(user=student_user, course=rc)
 
     return admin_user, student_user
+
+
+def create_student_account(username, name, gender='M', password='student123', student_id=None):
+    """建立資管一甲學生帳號，設定性別與學號，並自動預載資管一甲的 10 門班級必修課程"""
+    user = User.objects.create_user(
+        username=username,
+        password=password,
+        first_name=name
+    )
+    user.is_staff = False
+    user.is_superuser = False
+    user.save()
+
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    profile.gender = gender
+    profile.student_id = student_id or username
+    profile.student_class = '資管一甲'
+    profile.save()
+
+    # 自動預先登記資管一甲的所有必修課程
+    required_courses = Course.objects.filter(category='REQUIRED')
+    for rc in required_courses:
+        Enrollment.objects.get_or_create(user=user, course=rc)
+
+    return user
+

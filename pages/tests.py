@@ -203,4 +203,41 @@ class CourseSelectionTestCase(TestCase):
         self.assertEqual(res_admin.status_code, 200)
         self.assertEqual(res_admin.context['tab'], 'admin_courses')
 
+    def test_student_gender_and_add_student_feature(self):
+        """驗證張家豪為男生、性別欄位存在，以及管理員新增資管一甲學生帳號功能"""
+        # 1. 驗證張家豪性別為男，班級為資管一甲
+        profile = self.student_user.profile
+        self.assertEqual(profile.gender, 'M')
+        self.assertEqual(profile.get_gender_display(), '男')
+        self.assertEqual(profile.student_class, '資管一甲')
+
+        # 2. 測試管理員新增資管一甲學生帳號 (例如: 林美美, 女生)
+        self.client.force_login(self.admin_user)
+        new_student_data = {
+            'username': 'student2',
+            'name': '林美美',
+            'gender': 'F',
+            'student_id': 'B11305002',
+            'password': 'student123',
+        }
+        response = self.client.post(reverse('pages:add_student'), new_student_data, follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        # 驗證新學生已建立
+        new_stu = User.objects.get(username='student2')
+        self.assertEqual(new_stu.first_name, '林美美')
+        self.assertEqual(new_stu.profile.gender, 'F')
+        self.assertEqual(new_stu.profile.get_gender_display(), '女')
+        self.assertEqual(new_stu.profile.student_class, '資管一甲')
+
+        # 驗證新學生自動預載資管一甲的 10 門必修課
+        enrolled_required_count = Enrollment.objects.filter(user=new_stu, course__category='REQUIRED').count()
+        self.assertEqual(enrolled_required_count, 10)
+
+        # 3. 測試非管理員無法新增學生
+        self.client.force_login(self.student_user)
+        res_forbidden = self.client.post(reverse('pages:add_student'), new_student_data)
+        self.assertEqual(res_forbidden.status_code, 403)
+
+
 
