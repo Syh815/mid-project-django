@@ -508,3 +508,40 @@ def add_student(request):
     )
     return redirect('pages:students_roster')
 
+
+@login_required
+@require_POST
+def edit_student_id(request, user_id):
+    """教務管理員修改學生學號"""
+    if not (request.user.is_staff or request.user.username == 'admin'):
+        return HttpResponseForbidden("僅教務管理員可修改學生學號。")
+
+    target_user = get_object_or_404(User, id=user_id)
+    new_student_id = request.POST.get('student_id', '').strip()
+
+    if not new_student_id:
+        messages.error(request, "修改失敗：學生學號不可為空白！")
+        return redirect('pages:students_roster')
+
+    if len(new_student_id) > 20:
+        messages.error(request, "修改失敗：學生學號長度不得超過 20 個字元！")
+        return redirect('pages:students_roster')
+
+    # 檢查學號是否與其他學生重複
+    if UserProfile.objects.filter(student_id=new_student_id).exclude(user=target_user).exists():
+        messages.error(request, f"修改失敗：學號【{new_student_id}】已被其他學生使用，請確認後重新輸入！")
+        return redirect('pages:students_roster')
+
+    profile, _ = UserProfile.objects.get_or_create(user=target_user)
+    old_student_id = profile.student_id or target_user.username
+    profile.student_id = new_student_id
+    profile.save()
+
+    student_name = target_user.first_name if target_user.first_name else target_user.username
+    messages.success(
+        request,
+        f"成功將學生【{student_name}】（帳號: {target_user.username}）的學號更新為【{new_student_id}】！"
+    )
+    return redirect('pages:students_roster')
+
+

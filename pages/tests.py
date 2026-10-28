@@ -2,7 +2,7 @@ from django.test import TestCase, Client
 from django.contrib.auth.models import User
 from django.urls import reverse
 from pages.models import Course, Enrollment
-from pages.utils import init_demo_data
+from pages.utils import init_demo_data, create_student_account
 
 class CourseSelectionTestCase(TestCase):
     def setUp(self):
@@ -238,6 +238,56 @@ class CourseSelectionTestCase(TestCase):
         self.client.force_login(self.student_user)
         res_forbidden = self.client.post(reverse('pages:add_student'), new_student_data)
         self.assertEqual(res_forbidden.status_code, 403)
+
+    def test_admin_edit_student_id_feature(self):
+        """驗證管理員可成功修改學生學號、權限校驗與重複/空白學號之防護機制"""
+        # 1. 驗證張家豪原始學號
+        self.student_user.profile.refresh_from_db()
+        self.assertEqual(self.student_user.profile.student_id, 'B11305001')
+
+        # 2. 管理員成功修改學號為 B11305088
+        self.client.force_login(self.admin_user)
+        url = reverse('pages:edit_student_id', args=[self.student_user.id])
+        response = self.client.post(url, {'student_id': 'B11305088'}, follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        # 驗證資料庫已更新
+        self.student_user.profile.refresh_from_db()
+        self.assertEqual(self.student_user.profile.student_id, 'B11305088')
+
+        # 驗證學生登入後首頁即時顯示新學號
+        self.client.force_login(self.student_user)
+        res_index = self.client.get(reverse('pages:index'))
+        self.assertContains(res_index, 'B11305088')
+
+        # 3. 測試管理員不能將學號改為空白
+        self.client.force_login(self.admin_user)
+        res_empty = self.client.post(url, {'student_id': '   '}, follow=True)
+        self.assertContains(res_empty, '學生學號不可為空白')
+        self.student_user.profile.refresh_from_db()
+        self.assertEqual(self.student_user.profile.student_id, 'B11305088')
+
+        # 4. 測試防止學號與其他學生重複
+        # 先建立另一名學生 student2 (學號: B11305002)
+        create_student_account(
+            username='student2',
+            name='李小明',
+            gender='M',
+            password='student123',
+            student_id='B11305002'
+        )
+        res_dup = self.client.post(url, {'student_id': 'B11305002'}, follow=True)
+        self.assertContains(res_dup, '已被其他學生使用')
+        self.student_user.profile.refresh_from_db()
+        self.assertEqual(self.student_user.profile.student_id, 'B11305088')
+
+        # 5. 測試非管理員(一般學生)無法修改他人學號
+        self.client.force_login(self.student_user)
+        res_forbidden = self.client.post(url, {'student_id': 'B11305999'})
+        self.assertEqual(res_forbidden.status_code, 403)
+        self.student_user.profile.refresh_from_db()
+        self.assertEqual(self.student_user.profile.student_id, 'B11305088')
+
 
 
 

@@ -1,7 +1,9 @@
 from django.contrib import admin
 from django import forms
 from django.utils.safestring import mark_safe
-from .models import Course, Enrollment
+from django.contrib.auth.models import User
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from .models import Course, Enrollment, UserProfile
 
 DEFAULT_TEACHERS = [
     '黃燕萍', '李俞麟', '唐日新', '林俊杰', '丁慧瑩',
@@ -63,4 +65,37 @@ class EnrollmentAdmin(admin.ModelAdmin):
     list_display = ('user', 'course', 'created_at')
     list_filter = ('course__category', 'course')
     search_fields = ('user__username', 'course__name')
+
+
+try:
+    admin.site.unregister(User)
+except admin.sites.NotRegistered:
+    pass
+
+class UserProfileInline(admin.StackedInline):
+    model = UserProfile
+    can_delete = False
+    verbose_name = "學生個人資訊 / 學號設定"
+    verbose_name_plural = "學生個人資訊 / 學號設定"
+
+@admin.register(User)
+class CustomUserAdmin(BaseUserAdmin):
+    inlines = (UserProfileInline,)
+    list_display = ('username', 'first_name', 'get_student_id', 'get_gender', 'is_staff')
+
+    @admin.display(description="學號")
+    def get_student_id(self, obj):
+        return getattr(obj.profile, 'student_id', '') if hasattr(obj, 'profile') else ''
+
+    @admin.display(description="性別")
+    def get_gender(self, obj):
+        return obj.profile.get_gender_display() if hasattr(obj, 'profile') else ''
+
+@admin.register(UserProfile)
+class UserProfileAdmin(admin.ModelAdmin):
+    list_display = ('user', 'student_id', 'student_class', 'gender', 'updated_at')
+    list_editable = ('student_id',)
+    search_fields = ('user__username', 'user__first_name', 'student_id')
+    list_filter = ('student_class', 'gender')
+
 

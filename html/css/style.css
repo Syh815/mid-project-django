@@ -642,6 +642,17 @@ body {
   color: #ffffff;
 }
 
+.btn-outline-primary {
+  background-color: #ffffff;
+  color: var(--univ-blue);
+  border-color: var(--univ-blue);
+}
+
+.btn-outline-primary:hover {
+  background-color: var(--univ-blue);
+  color: #ffffff;
+}
+
 .btn-disabled {
   background-color: #e9ecef;
   color: #6c757d;
