@@ -8,23 +8,55 @@
     <div>
         <div class="info-title">
             {% if is_admin %}
-                <i class="fa-solid fa-screwdriver-wrench" style="color: var(--univ-navy);"></i> 資管一甲 • 教務課程維護管理
+                <i class="fa-solid fa-screwdriver-wrench" style="color: var(--univ-navy);"></i> 全系教務課程與名冊維護管理
+            {% elif is_teacher %}
+                <i class="fa-solid fa-chalkboard-user" style="color: var(--univ-navy);"></i> 授課教師專區 • 課程與學生管理 ({{ request.user.first_name|default:request.user.username }})
             {% else %}
-                <i class="fa-solid fa-address-card" style="color: var(--univ-navy);"></i> 資管一甲 • 學生選課系統 ({{ request.user.first_name|default:"張家豪" }})
+                <i class="fa-solid fa-address-card" style="color: var(--univ-navy);"></i> 資訊管理學系 • 學生選課系統 ({{ request.user.first_name|default:"學生" }})
             {% endif %}
         </div>
         <div class="info-desc">
             {% if is_admin %}
-                您正在以<strong>【教務處管理員 (admin)】</strong>身份操作。您可檢視與調整資管一甲所有的課程資料、上課節次與教室，並隨時<strong>切換各課程是否開放學生選修</strong>。
+                您正在以<strong>【教務處管理員 (admin)】</strong>身份操作。您可檢視與調整資管一至三甲所有的課程資料、上課節次與教室，管理學生學號與所屬班級，並可<strong>創建與管理教師帳號</strong>。
+            {% elif is_teacher %}
+                教師姓名：<strong>{{ request.user.first_name|default:request.user.username }}</strong> ｜ 教師帳號：<strong>{{ request.user.username }}</strong> ｜ 身份：<strong>授課教師</strong>。您可於下方檢視您所授課的全部班級課程、修課學生名單，並可隨時管理所授課程的選修開放狀態。
             {% else %}
-                學生姓名：<strong>{{ request.user.first_name|default:"張家豪" }}</strong> ｜ 性別：<strong>{{ request.user.profile.get_gender_display|default:"男" }}</strong> ｜ 學號：<strong>{{ request.user.profile.student_id|default:"B11305001" }}</strong> ｜ 班級：<strong>{{ request.user.profile.student_class|default:"資管一甲" }}</strong>。以下為您本學期標準課表，您可於「額外選修加選區」自主加退選課程。
+                學生姓名：<strong>{{ request.user.first_name|default:"學生" }}</strong> ｜ 性別：<strong>{{ request.user.profile.get_gender_display|default:"男" }}</strong> ｜ 學號：<strong>{{ request.user.profile.student_id|default:request.user.username }}</strong> ｜ 所屬班級：<strong style="color: var(--univ-navy);">{{ request.user.profile.student_class|default:"資管一甲" }}</strong>。您可查閱資管一至三甲每週課表，並於「額外選修加選區」加退選您所屬班級之選修課程。
             {% endif %}
         </div>
     </div>
 
     <!-- 統計數據看板 -->
     <div class="info-stats-row">
-        {% if not is_admin %}
+        {% if is_admin %}
+            <div class="info-stat-box">
+                <div class="info-stat-value">{{ total_courses_count }}</div>
+                <div class="info-stat-label">總開設課程</div>
+            </div>
+            <div class="info-stat-box" style="border-left: 3px solid var(--success);">
+                <div class="info-stat-value" style="color: var(--success);">{{ open_courses_count }}</div>
+                <div class="info-stat-label">開放選修中</div>
+            </div>
+            <div class="info-stat-box">
+                <div class="info-stat-value">{{ teachers_admin_list|length }}</div>
+                <div class="info-stat-label">教師帳號數</div>
+            </div>
+            <div class="info-stat-box">
+                <div class="info-stat-value">{{ students_list|length }}</div>
+                <div class="info-stat-label">學生總人數</div>
+            </div>
+        {% elif is_teacher %}
+            <div class="info-stat-box">
+                <div class="info-stat-value">{{ teacher_courses|length }}</div>
+                <div class="info-stat-label">授課門數</div>
+            </div>
+            <div class="info-stat-box" style="border-left: 3px solid var(--univ-navy);">
+                <div class="info-stat-value" style="color: var(--univ-navy);">
+                    授課中
+                </div>
+                <div class="info-stat-label">教師權限狀態</div>
+            </div>
+        {% else %}
             <div class="info-stat-box">
                 <div class="info-stat-value">{{ total_credits }}</div>
                 <div class="info-stat-label">已選總學分</div>
@@ -41,16 +73,6 @@
                 <div class="info-stat-value">{{ course_count }}</div>
                 <div class="info-stat-label">已選門數</div>
             </div>
-        {% else %}
-            <!-- 管理員端：依要求移除必修科目數，開放選修數同步真實數量 -->
-            <div class="info-stat-box">
-                <div class="info-stat-value">{{ total_courses_count }}</div>
-                <div class="info-stat-label">總開設課程</div>
-            </div>
-            <div class="info-stat-box" style="border-left: 3px solid var(--success);">
-                <div class="info-stat-value" style="color: var(--success);">{{ open_courses_count }}</div>
-                <div class="info-stat-label">開放選修中</div>
-            </div>
         {% endif %}
     </div>
 </div>
@@ -66,22 +88,30 @@
             <li class="breadcrumb-separator"><i class="fa-solid fa-angle-right"></i></li>
             <li class="breadcrumb-item">
                 <span class="breadcrumb-category">
-                    {% if is_admin %}<i class="fa-solid fa-screwdriver-wrench"></i> 教務管理系統{% else %}<i class="fa-solid fa-book-open-reader"></i> 學生網路選課{% endif %}
+                    {% if is_admin %}
+                        <i class="fa-solid fa-screwdriver-wrench"></i> 教務管理系統
+                    {% elif is_teacher %}
+                        <i class="fa-solid fa-chalkboard-user"></i> 教師管理專區
+                    {% else %}
+                        <i class="fa-solid fa-book-open-reader"></i> 學生網路選課
+                    {% endif %}
                 </span>
             </li>
             <li class="breadcrumb-separator"><i class="fa-solid fa-angle-right"></i></li>
             <li class="breadcrumb-item active" id="breadcrumbActiveItem">
                 <span id="breadcrumbCurrentText">
                     {% if tab == 'timetable' %}
-                        {% if is_admin %}資管一甲標準課表總覽{% else %}我的週課表{% endif %}
+                        {% if is_student %}我的週課表與班級查詢{% else %}各班級每週課表總覽{% endif %}
                     {% elif tab == 'electives' %}
                         額外選修加選區
                     {% elif tab == 'enrolled' %}
                         已選課程明細
+                    {% elif tab == 'teacher_courses' %}
+                        我的授課課程與修課學生
                     {% elif tab == 'admin_courses' %}
                         全系課程維護與選修開關
                     {% elif tab == 'students_roster' %}
-                        學生選課名冊統計
+                        學生與教師名冊統計
                     {% else %}
                         課表與選課
                     {% endif %}
@@ -90,13 +120,30 @@
         </ol>
     </div>
     <div class="breadcrumb-url-badge" title="目前語意化目錄路徑">
-        <i class="fa-solid fa-link"></i> <code id="breadcrumbUrlPath">{% if tab == 'timetable' %}/timetable/{% elif tab == 'electives' %}/electives/{% elif tab == 'enrolled' %}/enrolled/{% elif tab == 'admin_courses' %}/manage/courses/{% elif tab == 'students_roster' %}/manage/students/{% else %}/timetable/{% endif %}</code>
+        <i class="fa-solid fa-link"></i> <code id="breadcrumbUrlPath">{% if tab == 'timetable' %}/timetable/{% elif tab == 'electives' %}/electives/{% elif tab == 'enrolled' %}/enrolled/{% elif tab == 'teacher_courses' %}/teacher/courses/{% elif tab == 'admin_courses' %}/manage/courses/{% elif tab == 'students_roster' %}/manage/students/{% else %}/timetable/{% endif %}</code>
     </div>
 </nav>
 
 <!-- 系統功能選單頁籤 (Classic Tabs) -->
 <nav class="portal-tabs" id="portalTabNav">
-    {% if not is_admin %}
+    {% if is_teacher %}
+        <a href="{% url 'pages:teacher_courses' %}" class="portal-tab-item {% if tab == 'teacher_courses' %}active{% endif %}" data-tab="tab-teacher-courses" data-url="{% url 'pages:teacher_courses' %}" data-title="我的授課課程與修課學生" data-path="/teacher/courses/">
+            <i class="fa-solid fa-chalkboard-user"></i> 我的授課課程與修課學生
+        </a>
+        <a href="{% url 'pages:timetable' %}" class="portal-tab-item {% if tab == 'timetable' %}active{% endif %}" data-tab="tab-timetable" data-url="{% url 'pages:timetable' %}" data-title="各班級課表查詢" data-path="/timetable/">
+            <i class="fa-solid fa-table"></i> 各班級課表查詢
+        </a>
+    {% elif is_admin %}
+        <a href="{% url 'pages:manage_courses' %}" class="portal-tab-item {% if tab == 'admin_courses' %}active{% endif %}" data-tab="tab-admin-courses" data-url="{% url 'pages:manage_courses' %}" data-title="全系課程維護與選修開關" data-path="/manage/courses/">
+            <i class="fa-solid fa-list-check"></i> 全系課程維護與選修開關
+        </a>
+        <a href="{% url 'pages:timetable' %}" class="portal-tab-item {% if tab == 'timetable' %}active{% endif %}" data-tab="tab-timetable" data-url="{% url 'pages:timetable' %}" data-title="各班級課表總覽" data-path="/timetable/">
+            <i class="fa-solid fa-table"></i> 各班級課表總覽
+        </a>
+        <a href="{% url 'pages:students_roster' %}" class="portal-tab-item {% if tab == 'students_roster' %}active{% endif %}" data-tab="tab-students-roster" data-url="{% url 'pages:students_roster' %}" data-title="學生與教師名冊統計" data-path="/manage/students/">
+            <i class="fa-solid fa-users"></i> 學生與教師名冊統計
+        </a>
+    {% else %}
         <a href="{% url 'pages:timetable' %}" class="portal-tab-item {% if tab == 'timetable' %}active{% endif %}" data-tab="tab-timetable" data-url="{% url 'pages:timetable' %}" data-title="我的週課表" data-path="/timetable/">
             <i class="fa-regular fa-calendar-days"></i> 我的週課表
         </a>
@@ -106,31 +153,39 @@
         <a href="{% url 'pages:enrolled' %}" class="portal-tab-item {% if tab == 'enrolled' %}active{% endif %}" data-tab="tab-enrolled" data-url="{% url 'pages:enrolled' %}" data-title="已選課程明細" data-path="/enrolled/">
             <i class="fa-solid fa-list-check"></i> 已選課程明細
         </a>
-    {% else %}
-        <a href="{% url 'pages:manage_courses' %}" class="portal-tab-item {% if tab == 'admin_courses' %}active{% endif %}" data-tab="tab-admin-courses" data-url="{% url 'pages:manage_courses' %}" data-title="全系課程維護與選修開關" data-path="/manage/courses/">
-            <i class="fa-solid fa-list-check"></i> 全系課程維護與選修開關
-        </a>
-        <a href="{% url 'pages:timetable' %}" class="portal-tab-item {% if tab == 'timetable' %}active{% endif %}" data-tab="tab-timetable" data-url="{% url 'pages:timetable' %}" data-title="資管一甲標準課表總覽" data-path="/timetable/">
-            <i class="fa-solid fa-table"></i> 資管一甲標準課表總覽
-        </a>
-        <a href="{% url 'pages:students_roster' %}" class="portal-tab-item {% if tab == 'students_roster' %}active{% endif %}" data-tab="tab-students-roster" data-url="{% url 'pages:students_roster' %}" data-title="學生選課名冊統計" data-path="/manage/students/">
-            <i class="fa-solid fa-users"></i> 學生選課名冊統計
-        </a>
     {% endif %}
 </nav>
 
 <!-- ==========================================
      TAB 1: 週課表視圖 (Timetable View)
-     完全參考第二張圖片排版與視覺樣式
+     支援資管一甲、資管二甲、資管三甲 課表切換查詢
      ========================================== -->
 <div class="tab-pane" id="pane-tab-timetable" {% if tab != 'timetable' %}style="display: none;"{% endif %}>
     <div class="timetable-container">
-        <div class="timetable-header-bar">
-            <div>
+        <div class="timetable-header-bar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                 <strong style="font-size: 1.05rem; color: var(--univ-navy);">
                     <i class="fa-solid fa-table-cells"></i>
-                    {% if not is_admin %}資管一甲 • 學生個人本學期每週課表 ({{ request.user.first_name|default:"張家豪" }}){% else %}資管一甲 • 全班標準每週課表總覽{% endif %}
+                    {% if is_student and selected_class == student_class %}
+                        我的個人本學期每週課表 ({{ selected_class }} • {{ request.user.first_name|default:"學生" }})
+                    {% else %}
+                        {{ selected_class }} • 每週課表總覽
+                    {% endif %}
                 </strong>
+
+                <!-- 班級課表切換器 (資管一甲、資管二甲、資管三甲) -->
+                <div style="display: inline-flex; background: #e2e8f0; border-radius: 6px; padding: 2px; gap: 3px; border: 1px solid #cbd5e1;">
+                    {% for c_name in class_list %}
+                        <a href="{% url 'pages:timetable' %}?class_name={{ c_name }}"
+                           class="class-switcher-btn {% if selected_class == c_name %}active{% endif %}"
+                           title="切換查看 {{ c_name }} 每週課表">
+                            {{ c_name }}
+                            {% if is_student and c_name == student_class %}
+                                <small style="font-size: 0.7rem; font-weight: normal; opacity: 0.85;">(本班)</small>
+                            {% endif %}
+                        </a>
+                    {% endfor %}
+                </div>
             </div>
             <div style="font-size: 0.85rem; display: flex; gap: 0.75rem; align-items: center;">
                 <span>圖例：</span>
@@ -138,6 +193,13 @@
                 <span class="badge-tag badge-elective">選修</span>
             </div>
         </div>
+
+        {% if selected_class != '資管一甲' and selected_class != student_class %}
+            <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 4px; padding: 0.6rem 0.9rem; margin-bottom: 0.75rem; font-size: 0.825rem; color: #64748b; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-circle-info" style="color: var(--univ-navy);"></i>
+                <span>目前正在查閱<strong>【{{ selected_class }}】</strong>之每週課表。目前該班級課表尚在編排中，暫無排定課程。</span>
+            </div>
+        {% endif %}
 
         <div style="overflow-x: auto;">
             <table class="timetable-table">
@@ -232,7 +294,7 @@
 <!-- ==========================================
      TAB 2: 額外選修加選區 (For Student)
      ========================================== -->
-{% if not is_admin %}
+{% if is_student %}
 <div class="tab-pane" id="pane-tab-electives" {% if tab != 'electives' %}style="display: none;"{% endif %}>
     <div class="card-classic">
         <div class="card-classic-header">
@@ -258,6 +320,7 @@
                             <th class="col-code">課程代碼</th>
                             <th class="col-name">課程名稱</th>
                             <th class="col-category">類別</th>
+                            <th style="width: 90px; text-align: center;">開課班級</th>
                             <th class="col-time">上課時段</th>
                             <th class="col-room">教室</th>
                             <th class="col-teacher">授課教師</th>
@@ -284,6 +347,11 @@
                                     <!-- 類別欄位：嚴格單行不破版 -->
                                     <td class="col-category">
                                         <span class="badge-tag badge-elective">選修</span>
+                                    </td>
+                                    <td style="text-align: center;">
+                                        <span class="badge-tag" style="background: #e0f2fe; color: #0369a1; font-weight: 600;">
+                                            {{ item.target_class }}
+                                        </span>
                                     </td>
                                     <td class="col-time">{{ item.course.period_display }}</td>
                                     <td>{{ item.course.classroom }}</td>
@@ -319,6 +387,10 @@
                                             <button type="button" class="btn btn-disabled" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;" disabled>
                                                 未開放
                                             </button>
+                                        {% elif not item.is_class_match %}
+                                            <button type="button" class="btn btn-disabled" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; color: #64748b; background: #f1f5f9; border: 1px solid #cbd5e1;" disabled title="此選修僅開放【{{ item.target_class }}】學生選修，您目前所屬班級為【{{ student_class }}】">
+                                                非本班選修
+                                            </button>
                                         {% elif item.conflict_with %}
                                             <button type="button" class="btn btn-disabled" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; color: #b07d00;" disabled title="與【{{ item.conflict_with.name }}】時段衝突">
                                                 衝堂無法選
@@ -353,7 +425,7 @@
     <div class="card-classic">
         <div class="card-classic-header">
             <div>
-                <i class="fa-solid fa-clipboard-check"></i> 張家豪 本學期已選全部修習課程名冊
+                <i class="fa-solid fa-clipboard-check"></i> {{ request.user.first_name|default:request.user.username }} 本學期已選全部修習課程名冊
             </div>
             <div style="font-weight: normal; font-size: 0.85rem; color: var(--text-muted);">
                 共 <strong>{{ enrolled_courses|length }}</strong> 門課程，合計 <strong>{{ total_credits }}</strong> 學分
@@ -366,6 +438,7 @@
                         <th class="col-code">課程代碼</th>
                         <th class="col-name">課程名稱</th>
                         <th class="col-category">類別</th>
+                        <th style="width: 90px; text-align: center;">開課班級</th>
                         <th class="col-time">上課時段</th>
                         <th class="col-room">教室</th>
                         <th class="col-teacher">授課教師</th>
@@ -382,6 +455,11 @@
                             <td class="col-category">
                                 <span class="badge-tag {% if course.category == 'REQUIRED' %}badge-required{% else %}badge-elective{% endif %}">
                                     {{ course.get_category_display }}
+                                </span>
+                            </td>
+                            <td style="text-align: center;">
+                                <span class="badge-tag" style="background: #e0f2fe; color: #0369a1; font-weight: 600;">
+                                    {{ course.target_class }}
                                 </span>
                             </td>
                             <td>{{ course.period_display }}</td>
@@ -409,13 +487,145 @@
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="9" style="text-align: center; padding: 2rem; color: #888;">
+                            <td colspan="10" style="text-align: center; padding: 2rem; color: #888;">
                                 尚未有選課資料。
                             </td>
                         </tr>
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+<!-- ==========================================
+     TEACHER TAB: 我的授課課程與修課學生 (For Teacher & Admin)
+     ========================================== -->
+{% if is_teacher or is_admin %}
+<div class="tab-pane" id="pane-tab-teacher-courses" {% if tab != 'teacher_courses' %}style="display: none;"{% endif %}>
+    <div class="card-classic" style="margin-bottom: 1.5rem;">
+        <div class="card-classic-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+            <div>
+                <i class="fa-solid fa-chalkboard-user"></i>
+                {% if is_teacher %}
+                    授課教師【{{ request.user.first_name|default:request.user.username }}】開課管理與修課學生名單
+                {% else %}
+                    授課教師開課管理與修課學生名單總覽 (教務管理模式)
+                {% endif %}
+            </div>
+            <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal;">
+                共 <strong>{{ teacher_courses|length }}</strong> 門授課課程
+            </div>
+        </div>
+        <div class="card-classic-body" style="padding: 1.25rem;">
+            {% for tc_item in teacher_courses %}
+                <div style="border: 1px solid var(--border-color); border-radius: 6px; padding: 1.25rem; margin-bottom: 1.5rem; background: #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.75rem; margin-bottom: 0.75rem;">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                <strong style="font-size: 1.15rem; color: var(--univ-navy);">{{ tc_item.course.name }}</strong>
+                                <code>{{ tc_item.course.code }}</code>
+                                <span class="badge-tag {% if tc_item.course.category == 'REQUIRED' %}badge-required{% else %}badge-elective{% endif %}">
+                                    {{ tc_item.course.get_category_display }}
+                                </span>
+                                <span class="badge-tag" style="background: #e0f2fe; color: #0284c7; font-weight: 700;">
+                                    開課班級: {{ tc_item.course.target_class }}
+                                </span>
+                                {% if tc_item.course.teacher_user %}
+                                    <span class="badge-tag" style="background: #f1f5f9; color: #475569; font-size: 0.75rem;">
+                                        授課教師帳號: {{ tc_item.course.teacher_user.username }} ({{ tc_item.course.teacher }})
+                                    </span>
+                                {% endif %}
+                            </div>
+                            <div style="font-size: 0.85rem; color: #475569; margin-top: 0.4rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+                                <span><i class="fa-solid fa-chalkboard"></i> 教室: <strong>{{ tc_item.course.classroom }}</strong></span>
+                                <span><i class="fa-solid fa-clock"></i> 時段: <strong>{{ tc_item.course.period_display }}</strong></span>
+                                <span><i class="fa-solid fa-graduation-cap"></i> 學分: <strong>{{ tc_item.course.credits }}</strong> 學分</span>
+                                <span><i class="fa-solid fa-users"></i> 修課人數: <strong style="color: var(--univ-navy);">{{ tc_item.student_count }}</strong> / {{ tc_item.course.max_students }} 人</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <!-- 教師管理選修開關 -->
+                            <form action="{% url 'pages:toggle_course_status' tc_item.course.id %}" method="POST" style="margin: 0;">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{% url 'pages:teacher_courses' %}">
+                                <button type="submit" 
+                                        class="switch-btn {% if tc_item.course.is_open_for_enrollment %}open{% else %}closed{% endif %}"
+                                        title="點擊切換是否開放讓學生自主選修">
+                                    {% if tc_item.course.is_open_for_enrollment %}
+                                        <i class="fa-solid fa-check-circle"></i> 開放選修中 (點擊關閉)
+                                    {% else %}
+                                        <i class="fa-solid fa-lock"></i> 未開放選修 (點擊開放)
+                                    {% endif %}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- 修課學生名冊表格 -->
+                    <div>
+                        <div style="font-size: 0.9rem; font-weight: 700; color: #334155; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.35rem;">
+                            <i class="fa-solid fa-user-graduate" style="color: var(--univ-navy);"></i>
+                            選課修讀學生名冊 (共 {{ tc_item.student_count }} 人)
+                        </div>
+                        <table class="electives-table" style="font-size: 0.85rem;">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px; text-align: center;">序號</th>
+                                    <th style="width: 140px;">帳號 / 學號</th>
+                                    <th style="width: 120px;">學生姓名</th>
+                                    <th style="width: 100px; text-align: center;">班級</th>
+                                    <th style="width: 80px; text-align: center;">性別</th>
+                                    <th style="width: 160px;">選課時間</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stu_data in tc_item.enrolled_students %}
+                                    <tr>
+                                        <td style="text-align: center; color: #64748b;">{{ forloop.counter }}</td>
+                                        <td>
+                                            <strong style="color: var(--univ-navy);">{{ stu_data.user.username }}</strong>
+                                            <div style="font-size: 0.75rem; color: #64748b;">學號: {{ stu_data.profile.student_id|default:stu_data.user.username }}</div>
+                                        </td>
+                                        <td><strong>{{ stu_data.user.first_name|default:stu_data.user.username }}</strong></td>
+                                        <td style="text-align: center;">
+                                            <span class="badge-tag" style="background: #f8fafc; border: 1px solid #cbd5e1; color: var(--univ-navy); font-weight: 600;">
+                                                {{ stu_data.profile.student_class|default:"資管一甲" }}
+                                            </span>
+                                        </td>
+                                        <td style="text-align: center;">
+                                            {% if stu_data.profile.gender == 'M' %}
+                                                <span class="badge-tag" style="background: #e0f2fe; color: #0284c7; font-weight: 700;">男</span>
+                                            {% elif stu_data.profile.gender == 'F' %}
+                                                <span class="badge-tag" style="background: #fce7f3; color: #db2777; font-weight: 700;">女</span>
+                                            {% else %}
+                                                <span class="badge-tag" style="background: #f3f4f6; color: #4b5563;">其他</span>
+                                            {% endif %}
+                                        </td>
+                                        <td style="color: #64748b; font-size: 0.8rem;">
+                                            {{ stu_data.enrolled_at|date:"Y-m-d H:i" }}
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="6" style="text-align: center; padding: 1.5rem; color: #94a3b8;">
+                                            目前尚無學生選修本課程。
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% empty %}
+                <div style="text-align: center; padding: 3rem 1rem; color: #64748b;">
+                    <i class="fa-solid fa-circle-exclamation" style="font-size: 2.5rem; color: #cbd5e1; margin-bottom: 0.75rem; display: block;"></i>
+                    <strong style="font-size: 1.05rem; color: #334155; display: block; margin-bottom: 0.35rem;">目前無任教課程</strong>
+                    <p style="font-size: 0.85rem; color: #64748b; margin: 0;">若您已有新開設課程，請聯繫教務管理員在課程管理中將課程指派給您的教師帳號。</p>
+                </div>
+            {% endfor %}
         </div>
     </div>
 </div>
@@ -431,13 +641,13 @@
     <div class="card-classic">
         <div class="card-classic-header">
             <div>
-                <i class="fa-solid fa-sliders"></i> 資管一甲 課程維護管理與選修開放設定
+                <i class="fa-solid fa-sliders"></i> 全系課程維護管理與選修開放設定
             </div>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
                 <button type="button" class="btn btn-primary" onclick="openAddCourseModal()" id="btn-add-course">
                     <i class="fa-solid fa-plus"></i> 新增課程
                 </button>
-                <form action="{% url 'pages:reset_database' %}" method="POST" onsubmit="return confirm('確定要重設為資管一甲標準課表嗎？這將還原初始示範資料。');" style="display: inline;">
+                <form action="{% url 'pages:reset_database' %}" method="POST" onsubmit="return confirm('確定要重設為標準課表嗎？這將還原初始示範資料。');" style="display: inline;">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-secondary" title="還原初始資料庫狀態">
                         <i class="fa-solid fa-rotate-left"></i> 重設資料
@@ -453,6 +663,7 @@
                         <th class="col-code">代碼</th>
                         <th class="col-name">課程名稱</th>
                         <th class="col-category">類別</th>
+                        <th style="width: 90px; text-align: center;">開課班級</th>
                         <th class="col-time">上課時段</th>
                         <th class="col-room">教室</th>
                         <th class="col-teacher">授課教師</th>
@@ -475,9 +686,21 @@
                                     {{ course.get_category_display }}
                                 </span>
                             </td>
+                            <td style="text-align: center;">
+                                <span class="badge-tag" style="background: #e0f2fe; color: #0369a1; font-weight: 600;">
+                                    {{ course.target_class }}
+                                </span>
+                            </td>
                             <td class="col-time">{{ course.period_display }}</td>
                             <td class="col-room">{{ course.classroom }}</td>
-                            <td class="col-teacher"><strong>{{ course.teacher }}</strong></td>
+                            <td class="col-teacher">
+                                <strong>{{ course.teacher }}</strong>
+                                {% if course.display_teacher_username %}
+                                    <span style="font-size: 0.75rem; color: #64748b; font-weight: normal; display: block;">
+                                        ({{ course.display_teacher_username }})
+                                    </span>
+                                {% endif %}
+                            </td>
                             <td class="col-credits">{{ course.credits }}</td>
                             <td class="col-enrolled">
                                 <strong>{{ course.current_enrolled_count }}</strong> / {{ course.max_students }}
@@ -502,7 +725,23 @@
                                 <button type="button" 
                                         class="btn btn-secondary" 
                                         style="padding: 0.2rem 0.5rem; font-size: 0.75rem;"
-                                        onclick="openEditCourseModal('{{ course.id }}', '{{ course.code }}', '{{ course.name|escapejs }}', '{{ course.teacher|escapejs }}', '{{ course.classroom|escapejs }}', '{{ course.credits }}', '{{ course.category }}', '{{ course.day_of_week }}', '{{ course.start_period }}', '{{ course.end_period }}', '{{ course.is_open_for_enrollment }}', '{{ course.max_students }}', '{{ course.description|escapejs }}', '{{ course.color_tag }}')">
+                                        data-id="{{ course.id }}"
+                                        data-code="{{ course.code }}"
+                                        data-name="{{ course.name }}"
+                                        data-teacher="{{ course.teacher }}"
+                                        data-classroom="{{ course.classroom }}"
+                                        data-credits="{{ course.credits }}"
+                                        data-category="{{ course.category }}"
+                                        data-day="{{ course.day_of_week }}"
+                                        data-start="{{ course.start_period }}"
+                                        data-end="{{ course.end_period }}"
+                                        data-is-open="{{ course.is_open_for_enrollment }}"
+                                        data-max="{{ course.max_students }}"
+                                        data-desc="{{ course.description }}"
+                                        data-color="{{ course.color_tag }}"
+                                        data-target-class="{{ course.target_class }}"
+                                        data-teacher-user-id="{{ course.teacher_user_id }}"
+                                        onclick="openEditCourseFromBtn(this)">
                                     編輯
                                 </button>
                                 <form action="{% url 'pages:delete_course' course.id %}" method="POST" onsubmit="return confirm('確定要刪除課程【{{ course.name }}】嗎？');" style="display: inline;">
@@ -521,18 +760,23 @@
 </div>
 
 <!-- ==========================================
-     ADMIN TAB 2: 學生修課名冊統計 (For Admin)
+     ADMIN TAB 2: 學生與教師名冊統計 (For Admin)
      ========================================== -->
 <div class="tab-pane" id="pane-tab-students-roster" {% if tab != 'students_roster' %}style="display: none;"{% endif %}>
-    <!-- 區塊 1: 資管一甲 學生名冊與帳號管理 -->
+    <!-- 區塊 1: 學生帳號與修課名冊 -->
     <div class="card-classic" style="margin-bottom: 1.5rem;">
         <div class="card-classic-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
             <div>
-                <i class="fa-solid fa-user-graduate"></i> 資管一甲 學生帳號與修課名冊
+                <i class="fa-solid fa-user-graduate"></i> 學生帳號與修課名冊
             </div>
-            <button type="button" class="btn btn-primary" onclick="openAddStudentModal()" style="font-size: 0.85rem; padding: 0.35rem 0.85rem;" id="btnAddStudent">
-                <i class="fa-solid fa-user-plus"></i> 新增資管一甲學生
-            </button>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button type="button" class="btn btn-secondary" onclick="openAddTeacherModal()" style="font-size: 0.85rem; padding: 0.35rem 0.85rem;" id="btnAddTeacher">
+                    <i class="fa-solid fa-user-tie"></i> 新增教師帳號
+                </button>
+                <button type="button" class="btn btn-primary" onclick="openAddStudentModal()" style="font-size: 0.85rem; padding: 0.35rem 0.85rem;" id="btnAddStudent">
+                    <i class="fa-solid fa-user-plus"></i> 新增學生帳號
+                </button>
+            </div>
         </div>
         <div class="card-classic-body" style="padding: 0;">
             <table class="electives-table">
@@ -545,7 +789,7 @@
                         <th style="width: 160px; text-align: center;">已修學分 (必/選/總)</th>
                         <th style="width: 90px; text-align: center;">已選門數</th>
                         <th>目前修習課程清單</th>
-                        <th style="width: 110px; text-align: center;">管理操作</th>
+                        <th style="width: 120px; text-align: center;">管理操作</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -598,21 +842,120 @@
                                 </div>
                             </td>
                             <td style="text-align: center;">
-                                <button type="button" class="btn btn-outline-primary" style="font-size: 0.8rem; padding: 0.3rem 0.65rem; border-radius: 4px; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem;"
-                                    data-id="{{ stu.user.id }}"
-                                    data-name="{{ stu.user.first_name|default:stu.user.username }}"
-                                    data-username="{{ stu.user.username }}"
-                                    data-student-id="{{ stu.profile.student_id }}"
-                                    onclick="openEditStudentIdFromBtn(this)"
-                                    title="修改此學生之學號">
-                                    <i class="fa-solid fa-pen-to-square"></i> 修改學號
-                                </button>
+                                <div style="display: flex; gap: 0.4rem; justify-content: center; align-items: center; flex-wrap: wrap;">
+                                    <button type="button" class="btn btn-outline-primary" style="font-size: 0.8rem; padding: 0.3rem 0.65rem; border-radius: 4px; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem;"
+                                        data-id="{{ stu.user.id }}"
+                                        data-name="{{ stu.user.first_name|default:stu.user.username }}"
+                                        data-username="{{ stu.user.username }}"
+                                        data-student-id="{{ stu.profile.student_id }}"
+                                        data-student-class="{{ stu.profile.student_class|default:'資管一甲' }}"
+                                        onclick="openEditStudentIdFromBtn(this)"
+                                        title="修改此學生之學號與所屬班級">
+                                        <i class="fa-solid fa-pen-to-square"></i> 修改學號 / 班級
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger" style="font-size: 0.8rem; padding: 0.3rem 0.65rem; border-radius: 4px; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; color: #e11d48; border-color: #fda4af;"
+                                        data-id="{{ stu.user.id }}"
+                                        data-name="{{ stu.user.first_name|default:stu.user.username }}"
+                                        data-username="{{ stu.user.username }}"
+                                        data-role="學生"
+                                        onclick="openDeleteUserFromBtn(this)"
+                                        title="刪除此學生帳號">
+                                        <i class="fa-solid fa-user-xmark"></i> 刪除帳號
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     {% empty %}
                         <tr>
                             <td colspan="8" style="text-align: center; padding: 2rem; color: #888;">
-                                目前尚無學生資料。點擊上方「新增資管一甲學生」即可建立學生帳號！
+                                目前尚無學生資料。點擊上方「新增學生帳號」即可建立學生帳號！
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 區塊 2: 教師帳號名冊與授課狀況 (支援同名同姓帳號區隔) -->
+    <div class="card-classic" style="margin-bottom: 1.5rem;">
+        <div class="card-classic-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+            <div>
+                <i class="fa-solid fa-chalkboard-user"></i> 教師帳號名冊與授課狀況
+            </div>
+            <button type="button" class="btn btn-primary" onclick="openAddTeacherModal()" style="font-size: 0.85rem; padding: 0.35rem 0.85rem;">
+                <i class="fa-solid fa-user-tie"></i> 新增教師帳號
+            </button>
+        </div>
+        <div class="card-classic-body" style="padding: 0;">
+            <table class="electives-table">
+                <thead>
+                    <tr>
+                        <th style="width: 140px;">登入帳號</th>
+                        <th style="width: 120px;">教師姓名</th>
+                        <th style="width: 80px; text-align: center;">性別</th>
+                        <th style="width: 100px; text-align: center;">角色身分</th>
+                        <th style="width: 90px; text-align: center;">授課門數</th>
+                        <th>目前授課課程清單 (與同名帳號精確串接)</th>
+                        <th style="width: 120px; text-align: center;">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tea in teachers_admin_list %}
+                        <tr>
+                            <td>
+                                <strong style="color: var(--univ-navy); font-family: 'Consolas', monospace;">{{ tea.user.username }}</strong>
+                            </td>
+                            <td>
+                                <strong>{{ tea.user.first_name|default:tea.user.username }}</strong>
+                                {% if tea.user.first_name == '陳麒文' %}
+                                    <span class="badge-tag" style="background: #fef3c7; color: #92400e; font-size: 0.7rem;">同名獨立帳號</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: center;">
+                                {% if tea.profile.gender == 'M' %}
+                                    <span class="badge-tag" style="background: #e0f2fe; color: #0284c7; font-weight: 700;">男</span>
+                                {% elif tea.profile.gender == 'F' %}
+                                    <span class="badge-tag" style="background: #fce7f3; color: #db2777; font-weight: 700;">女</span>
+                                {% else %}
+                                    <span class="badge-tag" style="background: #f3f4f6; color: #4b5563;">其他</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: center;">
+                                <span class="badge-tag" style="background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; font-weight: 700;">
+                                    授課教師
+                                </span>
+                            </td>
+                            <td style="text-align: center;">
+                                <strong>{{ tea.courses_count }}</strong> 門
+                            </td>
+                            <td>
+                                <div style="display: flex; flex-wrap: wrap; gap: 0.35rem;">
+                                    {% for tc in tea.taught_courses %}
+                                        <span class="badge-tag {% if tc.category == 'REQUIRED' %}badge-required{% else %}badge-elective{% endif %}" style="font-size: 0.75rem;">
+                                            {{ tc.name }} ({{ tc.target_class }})
+                                        </span>
+                                    {% empty %}
+                                        <span style="color: #94a3b8; font-size: 0.8rem;">尚無指定授課課程</span>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                            <td style="text-align: center;">
+                                <button type="button" class="btn btn-outline-danger" style="font-size: 0.8rem; padding: 0.3rem 0.65rem; border-radius: 4px; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.3rem; color: #e11d48; border-color: #fda4af;"
+                                    data-id="{{ tea.user.id }}"
+                                    data-name="{{ tea.user.first_name|default:tea.user.username }}"
+                                    data-username="{{ tea.user.username }}"
+                                    data-role="教師"
+                                    onclick="openDeleteUserFromBtn(this)"
+                                    title="刪除此教師帳號">
+                                    <i class="fa-solid fa-user-xmark"></i> 刪除帳號
+                                </button>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 2rem; color: #888;">
+                                目前尚無教師帳號。點擊右上角「新增教師帳號」即可建立教師登入權限！
                             </td>
                         </tr>
                     {% endfor %}
@@ -690,7 +1033,7 @@
 <div class="modal-overlay" id="addStudentModal">
     <div class="modal-content" style="max-width: 520px;">
         <div class="modal-header">
-            <div class="modal-title"><i class="fa-solid fa-user-plus"></i> 新增資管一甲學生帳號</div>
+            <div class="modal-title"><i class="fa-solid fa-user-plus"></i> 新增學生帳號</div>
             <button type="button" class="modal-close" onclick="closeModal('addStudentModal')">&times;</button>
         </div>
         <form action="{% url 'pages:add_student' %}" method="POST">
@@ -724,8 +1067,12 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label">所屬班級 (固定)</label>
-                        <input type="text" class="form-control" value="資管一甲" disabled style="background-color: #f1f3f5; cursor: not-allowed; font-weight: 700; color: var(--univ-navy);">
+                        <label class="form-label">所屬班級 <span style="color: red;">*</span></label>
+                        <select name="student_class" class="form-control" style="font-weight: 700; color: var(--univ-navy);">
+                            <option value="資管一甲" selected>資管一甲</option>
+                            <option value="資管二甲">資管二甲</option>
+                            <option value="資管三甲">資管三甲</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label class="form-label">預設登入密碼</label>
@@ -735,24 +1082,76 @@
 
                 <div style="background: #e7f1ff; border: 1px solid #b6d4fe; border-radius: 4px; padding: 0.75rem; margin-top: 0.5rem; font-size: 0.825rem; color: #084298; line-height: 1.5;">
                     <i class="fa-solid fa-circle-info"></i> <strong>貼心說明：</strong>
-                    新增成功後，系統將<strong>自動為該學生載入「資管一甲」全部 10 門班級必修課程</strong>！該學生可立即以該帳號登入系統並自主加退選修課。
+                    新增成功後，系統將<strong>自動為該學生建立帳號並預載所屬班級之必修課表</strong>！該學生可立即以該帳號登入系統並自主加退選修課。
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('addStudentModal')">取消</button>
-                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> 確定建立帳號</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> 確定建立學生帳號</button>
             </div>
         </form>
     </div>
 </div>
 
 <!-- ==========================================
-     MODAL: 修改學生學號 Modal (For Admin)
+     MODAL: 新增教師帳號 Modal (For Admin)
+     支援同名同姓帳號獨立串接
+     ========================================== -->
+<div class="modal-overlay" id="addTeacherModal">
+    <div class="modal-content" style="max-width: 520px;">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fa-solid fa-chalkboard-user"></i> 新增教師帳號</div>
+            <button type="button" class="modal-close" onclick="closeModal('addTeacherModal')">&times;</button>
+        </div>
+        <form action="{% url 'pages:add_teacher' %}" method="POST">
+            {% csrf_token %}
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">教師姓名 <span style="color: red;">*</span></label>
+                        <input type="text" name="name" class="form-control" placeholder="例如: 陳麒文, 黃燕萍" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">性別 <span style="color: red;">*</span></label>
+                        <select name="gender" class="form-control" style="font-weight: 600;">
+                            <option value="M">男 (Male)</option>
+                            <option value="F">女 (Female)</option>
+                            <option value="O">其他 (Other)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">登入帳號 (Username) <span style="color: red;">*</span></label>
+                        <input type="text" name="username" class="form-control" placeholder="例如: chenkw, teacher01" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">預設登入密碼</label>
+                        <input type="text" name="password" class="form-control" value="teacher123" placeholder="預設: teacher123">
+                    </div>
+                </div>
+
+                <div style="background: #e7f1ff; border: 1px solid #b6d4fe; border-radius: 4px; padding: 0.75rem; margin-top: 0.5rem; font-size: 0.825rem; color: #084298; line-height: 1.5;">
+                    <i class="fa-solid fa-circle-info"></i> <strong>同名同姓精確串接說明：</strong>
+                    若有同名同姓之教師（例如兩位「陳麒文」老師），系統將透過各自不同的帳號（如 <code>chenkw</code> 與 <code>chenkw_mis</code>）精確獨立串接開課權限與選修學生名單，互不干擾。
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('addTeacherModal')">取消</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> 確定建立教師帳號</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ==========================================
+     MODAL: 修改學生學號與所屬班級 Modal (For Admin)
      ========================================== -->
 <div class="modal-overlay" id="editStudentIdModal">
     <div class="modal-content" style="max-width: 480px;">
         <div class="modal-header">
-            <div class="modal-title"><i class="fa-solid fa-id-card-clip"></i> 修改學生學號</div>
+            <div class="modal-title"><i class="fa-solid fa-id-card-clip"></i> 修改學生學號與所屬班級</div>
             <button type="button" class="modal-close" onclick="closeModal('editStudentIdModal')">&times;</button>
         </div>
         <form id="editStudentIdForm" action="" method="POST">
@@ -769,9 +1168,19 @@
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label">目前學號</label>
-                    <input type="text" id="editStudentCurrentId" class="form-control" disabled style="background-color: #f8fafc; cursor: not-allowed; color: #64748b; font-family: 'Consolas', monospace;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">目前學號</label>
+                        <input type="text" id="editStudentCurrentId" class="form-control" disabled style="background-color: #f8fafc; cursor: not-allowed; color: #64748b; font-family: 'Consolas', monospace;">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">所屬班級調整 <span style="color: red;">*</span></label>
+                        <select name="student_class" id="editStudentClassSelect" class="form-control" style="font-weight: 700; color: var(--univ-navy);">
+                            <option value="資管一甲">資管一甲</option>
+                            <option value="資管二甲">資管二甲</option>
+                            <option value="資管三甲">資管三甲</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -784,12 +1193,80 @@
 
                 <div style="background: #e7f1ff; border: 1px solid #b6d4fe; border-radius: 4px; padding: 0.75rem; margin-top: 0.5rem; font-size: 0.825rem; color: #084298; line-height: 1.5;">
                     <i class="fa-solid fa-circle-info"></i> <strong>提示說明：</strong>
-                    修改完成後，該學生之<strong>選課名冊、課表首頁頂部資訊欄及個人設定</strong>將立即同步顯示新學號。
+                    修改完成後，該學生之<strong>選課名冊、所屬班級、課表資訊及個人設定</strong>將立即同步更新生效。
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('editStudentIdModal')">取消</button>
-                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> 儲存學號修改</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> 儲存學號與班級修改</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ==========================================
+     MODAL: 管理員刪除帳號 Modal (需選取原因)
+     ========================================== -->
+<div class="modal-overlay" id="deleteUserModal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header" style="background: #fff1f2; border-bottom: 1px solid #fecdd3;">
+            <div class="modal-title" style="color: #be123c;">
+                <i class="fa-solid fa-triangle-exclamation"></i> 確認刪除帳號
+            </div>
+            <button type="button" class="modal-close" onclick="closeModal('deleteUserModal')">&times;</button>
+        </div>
+        <form id="deleteUserForm" action="{% url 'pages:delete_user' %}" method="POST" onsubmit="return validateDeleteUserForm();">
+            {% csrf_token %}
+            <input type="hidden" name="user_id" id="deleteUserId">
+            <div class="modal-body">
+                <div style="background: #fff1f2; border: 1px solid #fda4af; border-radius: 6px; padding: 0.85rem; margin-bottom: 1rem; color: #9f1239; font-size: 0.875rem; line-height: 1.5;">
+                    <i class="fa-solid fa-circle-exclamation" style="font-size: 1rem; margin-right: 0.25rem;"></i>
+                    <strong>警告：</strong> 帳號刪除後將無法還原，請謹慎操作！
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">欲刪除之姓名</label>
+                        <input type="text" id="deleteUserName" class="form-control" disabled style="background-color: #f8fafc; font-weight: 700; color: #0f172a;">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">登入帳號 (Username)</label>
+                        <input type="text" id="deleteUserUsername" class="form-control" disabled style="background-color: #f8fafc; font-weight: 700; font-family: 'Consolas', monospace; color: #0f172a;">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 0.5rem;">
+                    <label class="form-label" style="font-weight: 700; color: #334155;">
+                        刪除原因 <span style="color: red;">*</span>
+                    </label>
+                    <div style="display: flex; flex-direction: column; gap: 0.6rem; padding: 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem; margin-bottom: 0;">
+                            <input type="radio" name="reason_type" value="已退學" checked onchange="handleDeleteReasonChange(this)">
+                            <span><strong>已退學</strong> (學生退學離校或註銷學籍)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem; margin-bottom: 0;">
+                            <input type="radio" name="reason_type" value="已畢業" onchange="handleDeleteReasonChange(this)">
+                            <span><strong>已畢業</strong> (學生修畢規定學分畢業)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem; margin-bottom: 0;">
+                            <input type="radio" name="reason_type" value="其他" onchange="handleDeleteReasonChange(this)">
+                            <span><strong>其他</strong> (請於下方說明原因)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group" id="deleteReasonOtherGroup" style="display: none; margin-top: 0.75rem;">
+                    <label class="form-label" style="font-weight: 700; color: #334155;">
+                        其他原因說明 <span style="color: red;">*</span>
+                    </label>
+                    <textarea name="reason_other" id="deleteReasonOtherInput" class="form-control" rows="3" placeholder="請詳細說明刪除帳號的原因（例如：教職員離職、重複建檔、轉學等）..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('deleteUserModal')">取消</button>
+                <button type="submit" class="btn btn-danger" style="background: #e11d48; border-color: #be123c;">
+                    <i class="fa-solid fa-trash-can"></i> 確認執行刪除
+                </button>
             </div>
         </form>
     </div>
@@ -810,7 +1287,7 @@
 <div class="modal-overlay" id="addCourseModal">
     <div class="modal-content">
         <div class="modal-header">
-            <div class="modal-title"><i class="fa-solid fa-plus-circle"></i> 新增資管一甲課程</div>
+            <div class="modal-title"><i class="fa-solid fa-plus-circle"></i> 新增課程</div>
             <button type="button" class="modal-close" onclick="closeModal('addCourseModal')">&times;</button>
         </div>
         <form action="{% url 'pages:add_course' %}" method="POST">
@@ -829,7 +1306,7 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label">授課教師</label>
+                        <label class="form-label">授課教師姓名</label>
                         <div style="display: flex; gap: 0.35rem; align-items: center;">
                             <input type="text" name="teacher" id="addTeacherInput" list="teacherOptionsList" class="form-control" placeholder="打字輸入或由右側選擇" autocomplete="off" required>
                             <select class="form-control" style="width: auto; min-width: 125px; flex-shrink: 0; background-color: #f8fafc; cursor: pointer; font-size: 0.825rem;" onchange="if(this.value){ document.getElementById('addTeacherInput').value = this.value; this.value=''; document.getElementById('addTeacherInput').focus(); }" title="點擊快速選擇教師">
@@ -839,9 +1316,27 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <small style="display: block; margin-top: 0.25rem; font-size: 0.75rem; color: #64748b;">
-                            <i class="fa-solid fa-circle-info"></i> 可直接打字輸入新老師，或從選單快速挑選
-                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">指定授課教師帳號 (同名同姓區隔)</label>
+                        <select name="teacher_user_id" id="addTeacherUserId" class="form-control" onchange="if(this.value){ const opt=this.options[this.selectedIndex]; const tName=opt.getAttribute('data-name'); if(tName) document.getElementById('addTeacherInput').value = tName; }">
+                            <option value="" data-name="">-- 依教師姓名文字自動匹配 --</option>
+                            {% for tu in all_teacher_users %}
+                                <option value="{{ tu.id }}" data-name="{{ tu.first_name }}">{{ tu.first_name }} (帳號: {{ tu.username }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">開課班級對象</label>
+                        <select name="target_class" class="form-control" style="font-weight: 700; color: var(--univ-navy);">
+                            <option value="資管一甲" selected>資管一甲</option>
+                            <option value="資管二甲">資管二甲</option>
+                            <option value="資管三甲">資管三甲</option>
+                            <option value="ALL">全系開放選修 (ALL)</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label class="form-label">上課教室</label>
@@ -968,7 +1463,7 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label">授課教師</label>
+                        <label class="form-label">授課教師姓名</label>
                         <div style="display: flex; gap: 0.35rem; align-items: center;">
                             <input type="text" name="teacher" id="editTeacher" list="teacherOptionsList" class="form-control" placeholder="打字輸入或由右側選擇" autocomplete="off" required>
                             <select class="form-control" style="width: auto; min-width: 125px; flex-shrink: 0; background-color: #f8fafc; cursor: pointer; font-size: 0.825rem;" onchange="if(this.value){ document.getElementById('editTeacher').value = this.value; this.value=''; document.getElementById('editTeacher').focus(); }" title="點擊快速選擇教師">
@@ -978,9 +1473,27 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <small style="display: block; margin-top: 0.25rem; font-size: 0.75rem; color: #64748b;">
-                            <i class="fa-solid fa-circle-info"></i> 可直接打字修改，或從選單快速切換
-                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">指定授課教師帳號 (同名同姓區隔)</label>
+                        <select name="teacher_user_id" id="editTeacherUserId" class="form-control" onchange="if(this.value){ const opt=this.options[this.selectedIndex]; const tName=opt.getAttribute('data-name'); if(tName) document.getElementById('editTeacher').value = tName; }">
+                            <option value="" data-name="">-- 依教師姓名文字自動匹配 --</option>
+                            {% for tu in all_teacher_users %}
+                                <option value="{{ tu.id }}" data-name="{{ tu.first_name }}">{{ tu.first_name }} (帳號: {{ tu.username }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">開課班級對象</label>
+                        <select name="target_class" id="editTargetClass" class="form-control" style="font-weight: 700; color: var(--univ-navy);">
+                            <option value="資管一甲">資管一甲</option>
+                            <option value="資管二甲">資管二甲</option>
+                            <option value="資管三甲">資管三甲</option>
+                            <option value="ALL">全系開放選修 (ALL)</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label class="form-label">上課教室</label>
@@ -1092,8 +1605,9 @@
             <button type="button" class="modal-close" onclick="closeModal('courseDetailModal')">&times;</button>
         </div>
         <div class="modal-body">
-            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap;">
                 <span class="badge-tag badge-required" id="detailCategoryBadge">必修</span>
+                <span class="badge-tag" id="detailTargetClassBadge" style="background: #e0f2fe; color: #0369a1; font-weight: 600;">開課班級</span>
                 <span class="badge-tag" id="detailCodeBadge" style="background: #e9ecef; color: #333;">代碼</span>
                 <span class="badge-tag badge-open" id="detailOpenBadge">開放選修</span>
             </div>
@@ -1155,7 +1669,7 @@
                 breadcrumbUrl.textContent = path;
             }
 
-            // 無刷新同步瀏覽器網址列 (如 /enrolled/、/electives/、/timetable/)
+            // 無刷新同步瀏覽器網址列 (如 /enrolled/、/electives/、/timetable/、/teacher/courses/)
             if (updateHistory && path && window.history.pushState) {
                 window.history.pushState({ tabId: targetTabId, path: path, title: title }, title, path);
             }
@@ -1217,15 +1731,82 @@
         openModal('addStudentModal');
     }
 
+    function openAddTeacherModal() {
+        openModal('addTeacherModal');
+    }
+
     function openEditStudentIdFromBtn(btn) {
         const userId = btn.getAttribute('data-id');
         const name = btn.getAttribute('data-name');
         const username = btn.getAttribute('data-username');
         const studentId = btn.getAttribute('data-student-id');
-        openEditStudentIdModal(userId, name, username, studentId);
+        const studentClass = btn.getAttribute('data-student-class') || '資管一甲';
+        openEditStudentIdModal(userId, name, username, studentId, studentClass);
     }
 
-    function openEditStudentIdModal(userId, name, username, currentStudentId) {
+    function openDeleteUserFromBtn(btn) {
+        var userId = btn.getAttribute('data-id');
+        var userName = btn.getAttribute('data-name');
+        var username = btn.getAttribute('data-username');
+        var role = btn.getAttribute('data-role') || '學生';
+
+        document.getElementById('deleteUserId').value = userId;
+        document.getElementById('deleteUserName').value = userName + ' (' + role + ')';
+        document.getElementById('deleteUserUsername').value = username;
+
+        // 重設單選選項為預設（已退學）
+        var radios = document.getElementsByName('reason_type');
+        for (var i = 0; i < radios.length; i++) {
+            if (radios[i].value === '已退學') {
+                radios[i].checked = true;
+            }
+        }
+        var otherGroup = document.getElementById('deleteReasonOtherGroup');
+        var otherInput = document.getElementById('deleteReasonOtherInput');
+        if (otherGroup) otherGroup.style.display = 'none';
+        if (otherInput) {
+            otherInput.value = '';
+            otherInput.required = false;
+        }
+
+        openModal('deleteUserModal');
+    }
+
+    function handleDeleteReasonChange(radio) {
+        var otherGroup = document.getElementById('deleteReasonOtherGroup');
+        var otherInput = document.getElementById('deleteReasonOtherInput');
+        if (radio.value === '其他') {
+            if (otherGroup) otherGroup.style.display = 'block';
+            if (otherInput) {
+                otherInput.required = true;
+                otherInput.focus();
+            }
+        } else {
+            if (otherGroup) otherGroup.style.display = 'none';
+            if (otherInput) {
+                otherInput.required = false;
+            }
+        }
+    }
+
+    function validateDeleteUserForm() {
+        var selectedReason = document.querySelector('input[name="reason_type"]:checked');
+        if (!selectedReason) {
+            alert('請選擇刪除原因（已退學、已畢業、或其他）！');
+            return false;
+        }
+        if (selectedReason.value === '其他') {
+            var otherInput = document.getElementById('deleteReasonOtherInput');
+            if (!otherInput || !otherInput.value.trim()) {
+                alert('您選擇了「其他」，請填寫詳細刪除原因說明！');
+                if (otherInput) otherInput.focus();
+                return false;
+            }
+        }
+        return confirm('確定要永久刪除此帳號嗎？此操作將無法還原！');
+    }
+
+    function openEditStudentIdModal(userId, name, username, currentStudentId, studentClass) {
         const form = document.getElementById('editStudentIdForm');
         form.action = `/manage/student/${userId}/edit-id/`;
         document.getElementById('editStudentName').value = name || username;
@@ -1233,6 +1814,10 @@
         document.getElementById('editStudentCurrentId').value = currentStudentId || '(未設定)';
         const input = document.getElementById('editStudentIdInput');
         input.value = currentStudentId || username;
+        const classSelect = document.getElementById('editStudentClassSelect');
+        if (classSelect) {
+            classSelect.value = studentClass || '資管一甲';
+        }
         openModal('editStudentIdModal');
         setTimeout(() => {
             if (input) {
@@ -1245,10 +1830,32 @@
     function openAddCourseModal() {
         const tInput = document.getElementById('addTeacherInput');
         if (tInput) tInput.value = '';
+        const tuSelect = document.getElementById('addTeacherUserId');
+        if (tuSelect) tuSelect.value = '';
         openModal('addCourseModal');
     }
 
-    function openEditCourseModal(id, code, name, teacher, classroom, credits, category, day, startP, endP, isOpen, maxStudents, desc, color) {
+    function openEditCourseFromBtn(btn) {
+        const id = btn.getAttribute('data-id');
+        const code = btn.getAttribute('data-code');
+        const name = btn.getAttribute('data-name');
+        const teacher = btn.getAttribute('data-teacher');
+        const classroom = btn.getAttribute('data-classroom');
+        const credits = btn.getAttribute('data-credits');
+        const category = btn.getAttribute('data-category');
+        const day = btn.getAttribute('data-day');
+        const startP = btn.getAttribute('data-start');
+        const endP = btn.getAttribute('data-end');
+        const isOpen = btn.getAttribute('data-is-open');
+        const maxStudents = btn.getAttribute('data-max');
+        const desc = btn.getAttribute('data-desc');
+        const color = btn.getAttribute('data-color');
+        const targetClass = btn.getAttribute('data-target-class') || '資管一甲';
+        const teacherUserId = btn.getAttribute('data-teacher-user-id') || '';
+        openEditCourseModal(id, code, name, teacher, classroom, credits, category, day, startP, endP, isOpen, maxStudents, desc, color, targetClass, teacherUserId);
+    }
+
+    function openEditCourseModal(id, code, name, teacher, classroom, credits, category, day, startP, endP, isOpen, maxStudents, desc, color, targetClass, teacherUserId) {
         const form = document.getElementById('editCourseForm');
         form.action = `/manage/course/${id}/edit/`;
 
@@ -1263,8 +1870,14 @@
         document.getElementById('editEndPeriod').value = endP;
         document.getElementById('editIsOpenCheck').checked = (isOpen === 'True' || isOpen === 'true' || isOpen === true);
         document.getElementById('editMaxStudents').value = maxStudents;
-        document.getElementById('editDescription').value = desc;
-        document.getElementById('editColorTag').value = color;
+        document.getElementById('editDescription').value = desc || '';
+        document.getElementById('editColorTag').value = color || 'blue';
+
+        const tcElem = document.getElementById('editTargetClass');
+        if (tcElem) tcElem.value = targetClass || '資管一甲';
+
+        const tuElem = document.getElementById('editTeacherUserId');
+        if (tuElem) tuElem.value = teacherUserId || '';
 
         openModal('editCourseModal');
     }
@@ -1310,3 +1923,4 @@
     }
 </script>
 {% endblock %}
+

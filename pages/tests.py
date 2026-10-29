@@ -1,8 +1,8 @@
 from django.test import TestCase, Client
 from django.contrib.auth.models import User
 from django.urls import reverse
-from pages.models import Course, Enrollment
-from pages.utils import init_demo_data, create_student_account
+from pages.models import Course, Enrollment, UserProfile
+from pages.utils import init_demo_data, create_student_account, create_teacher_account
 
 class CourseSelectionTestCase(TestCase):
     def setUp(self):
@@ -13,6 +13,8 @@ class CourseSelectionTestCase(TestCase):
         """驗證預設帳號與課程建立"""
         self.assertTrue(User.objects.filter(username='admin').exists())
         self.assertTrue(User.objects.filter(username='student').exists())
+        self.assertTrue(User.objects.filter(username='chenkw').exists())
+        self.assertFalse(User.objects.filter(username__in=['chenkw1', 'chenkw2']).exists())
         self.assertEqual(self.student_user.first_name, '張家豪')
         self.assertGreaterEqual(Course.objects.count(), 10)
         # 課表必修科目數為 10 門
@@ -287,6 +289,324 @@ class CourseSelectionTestCase(TestCase):
         self.assertEqual(res_forbidden.status_code, 403)
         self.student_user.profile.refresh_from_db()
         self.assertEqual(self.student_user.profile.student_id, 'B11305088')
+
+    def test_admin_create_teacher_account(self):
+        """教務管理員可建立教師帳號，一般學生不可建立"""
+        self.client.force_login(self.admin_user)
+        add_url = reverse('pages:add_teacher')
+
+        # 管理員成功新增教師帳號
+        res = self.client.post(add_url, {
+            'username': 'prof_wang',
+            'name': '王大明',
+            'gender': 'M',
+            'password': 'teacher123'
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+
+        # 驗證資料庫建立成功且角色為 TEACHER
+        teacher_user = User.objects.get(username='prof_wang')
+        self.assertEqual(teacher_user.first_name, '王大明')
+        self.assertEqual(teacher_user.profile.role, 'TEACHER')
+        self.assertTrue(teacher_user.check_password('teacher123'))
+
+        # 學生嘗試新增教師帳號應被禁止 403
+        self.client.force_login(self.student_user)
+        res_forbidden = self.client.post(add_url, {
+            'username': 'prof_hacker',
+            'name': '黑客',
+            'gender': 'M',
+            'password': 'pass'
+        })
+        self.assertEqual(res_forbidden.status_code, 403)
+        self.assertFalse(User.objects.filter(username='prof_hacker').exists())
+
+    def test_teacher_same_name_separate_management_and_enrolled_roster(self):
+        """兩位同名同姓的陳麒文老師各自擁有獨立帳號，開課與修課學生管理完全互不干擾"""
+        # 1. 建立兩位同名同姓「陳麒文」老師
+        t1 = create_teacher_account(username='chenkw', name='陳麒文', password='teacher123')
+        t2 = create_teacher_account(username='chenkw_alt', name='陳麒文', password='pwd2')
+
+        # 2. 建立分別由兩位陳麒文老師任教之課程
+        c1 = Course.objects.create(
+            code='CKW101',
+            name='陳麒文老師甲的進階演算法',
+            teacher='陳麒文',
+            teacher_user=t1,
+            target_class='資管一甲',
+            classroom='電708',
+            credits=3,
+            category='ELECTIVE',
+            day_of_week=5,
+            start_period=1,
+            end_period=3,
+            is_open_for_enrollment=True,
+            max_students=40
+        )
+
+        c2 = Course.objects.create(
+            code='CKW102',
+            name='陳麒文老師乙的企業資源規劃',
+            teacher='陳麒文',
+            teacher_user=t2,
+            target_class='資管一甲',
+            classroom='藝406',
+            credits=3,
+            category='ELECTIVE',
+            day_of_week=5,
+            start_period=6,
+            end_period=8,
+            is_open_for_enrollment=False,
+            max_students=40
+        )
+
+        # 學生選修 c1
+        Enrollment.objects.create(user=self.student_user, course=c1)
+
+        # 3. 測試陳麒文老師 1 (chenkw) 登入
+        self.client.force_login(t1)
+        res_t1 = self.client.get(reverse('pages:teacher_courses'))
+        self.assertEqual(res_t1.status_code, 200)
+        # 能看到自己的課程 c1 與修課學生張家豪
+        self.assertContains(res_t1, '陳麒文老師甲的進階演算法')
+        self.assertContains(res_t1, '張家豪')
+        # 不能看到陳麒文老師 2 的課程 c2
+        self.assertNotContains(res_t1, '陳麒文老師乙的企業資源規劃')
+
+        # chenkw 可切換自己課程 c1 開放狀態
+        toggle_c1 = self.client.post(reverse('pages:toggle_course_status', args=[c1.id]), follow=True)
+        self.assertEqual(toggle_c1.status_code, 200)
+        c1.refresh_from_db()
+        self.assertFalse(c1.is_open_for_enrollment)
+
+        # chenkw 無法切換 chenkw_alt 的課程 c2 (應被禁止 403)
+        toggle_c2_by_t1 = self.client.post(reverse('pages:toggle_course_status', args=[c2.id]))
+        self.assertEqual(toggle_c2_by_t1.status_code, 403)
+
+        # 4. 測試陳麒文老師 2 (chenkw_alt) 登入
+        self.client.force_login(t2)
+        res_t2 = self.client.get(reverse('pages:teacher_courses'))
+        self.assertEqual(res_t2.status_code, 200)
+        # 能看到自己的課程 c2，但看不到 c1
+        self.assertContains(res_t2, '陳麒文老師乙的企業資源規劃')
+        self.assertNotContains(res_t2, '陳麒文老師甲的進階演算法')
+
+        # chenkw_alt 可切換自己課程 c2 開放狀態
+        toggle_c2 = self.client.post(reverse('pages:toggle_course_status', args=[c2.id]), follow=True)
+        self.assertEqual(toggle_c2.status_code, 200)
+        c2.refresh_from_db()
+        self.assertTrue(c2.is_open_for_enrollment)
+
+        # chenkw_alt 無法切換 chenkw 的課程 c1 (應被禁止 403)
+        toggle_c1_by_t2 = self.client.post(reverse('pages:toggle_course_status', args=[c1.id]))
+        self.assertEqual(toggle_c1_by_t2.status_code, 403)
+
+    def test_class_restricted_electives_and_admin_adjust_class(self):
+        """學生僅能加選自己所屬班級之選修課程，管理員可自由調整學生班級"""
+        # 建立一門資管二甲限定之選修課
+        c_mis2a = Course.objects.create(
+            code='MIS201',
+            name='資料庫管理專題',
+            teacher='唐日新',
+            target_class='資管二甲',
+            classroom='電708',
+            credits=3,
+            category='ELECTIVE',
+            day_of_week=4,
+            start_period=7,
+            end_period=9,
+            is_open_for_enrollment=True,
+            max_students=45
+        )
+
+        # 1. 學生原本所屬班級為「資管一甲」
+        self.client.force_login(self.student_user)
+        self.assertEqual(self.student_user.profile.student_class, '資管一甲')
+
+        # 學生嘗試加選資管二甲之課程 -> 應被攔截阻擋
+        res_enroll = self.client.post(reverse('pages:enroll_course', args=[c_mis2a.id]), follow=True)
+        self.assertEqual(res_enroll.status_code, 200)
+        self.assertFalse(Enrollment.objects.filter(user=self.student_user, course=c_mis2a).exists())
+        self.assertContains(res_enroll, '為【資管二甲】限定選修課程')
+
+        # 2. 管理員將學生班級調整為「資管二甲」
+        self.client.force_login(self.admin_user)
+        edit_url = reverse('pages:edit_student_id', args=[self.student_user.id])
+        res_admin = self.client.post(edit_url, {
+            'student_id': self.student_user.profile.student_id,
+            'student_class': '資管二甲'
+        }, follow=True)
+        self.assertEqual(res_admin.status_code, 200)
+
+        # 驗證資料庫中班級已更新為資管二甲
+        self.student_user.profile.refresh_from_db()
+        self.assertEqual(self.student_user.profile.student_class, '資管二甲')
+
+        # 3. 學生登入後現在可以加選資管二甲之課程
+        self.client.force_login(self.student_user)
+        res_enroll_ok = self.client.post(reverse('pages:enroll_course', args=[c_mis2a.id]), follow=True)
+        self.assertEqual(res_enroll_ok.status_code, 200)
+        self.assertTrue(Enrollment.objects.filter(user=self.student_user, course=c_mis2a).exists())
+
+    def test_class_timetable_switching(self):
+        """使用者可查閱資管一甲、資管二甲、資管三甲課表，二三甲暫無課程時顯示編排中提示"""
+        self.client.force_login(self.student_user)
+
+        # 查閱資管一甲課表
+        res_1a = self.client.get(reverse('pages:timetable') + '?class_name=資管一甲')
+        self.assertEqual(res_1a.status_code, 200)
+        self.assertContains(res_1a, '資訊管理導論')
+
+        # 查閱資管二甲課表（暫未排課）
+        res_2a = self.client.get(reverse('pages:timetable') + '?class_name=資管二甲')
+        self.assertEqual(res_2a.status_code, 200)
+        self.assertContains(res_2a, '【資管二甲】')
+        self.assertContains(res_2a, '尚在編排中')
+
+        # 查閱資管三甲課表（暫未排課）
+        res_3a = self.client.get(reverse('pages:timetable') + '?class_name=資管三甲')
+        self.assertEqual(res_3a.status_code, 200)
+        self.assertContains(res_3a, '【資管三甲】')
+        self.assertContains(res_3a, '尚在編排中')
+
+    def test_teacher_display_username_yajusenpai(self):
+        """驗證田所浩二 (yajusenpai) 老師帳號建立與課程之帳號名稱顯示"""
+        # 1. 建立田所浩二教師帳號 yajusenpai
+        t_user = create_teacher_account(username='yajusenpai', name='田所浩二', password='teacher123')
+        
+        # 2. 獲取由田所浩二授課之課程 HM101
+        c_jp = Course.objects.get(code='HM101')
+        self.assertEqual(c_jp.teacher, '田所浩二')
+        # 驗證 display_teacher_username 自動對應至 yajusenpai
+        self.assertEqual(c_jp.display_teacher_username, 'yajusenpai')
+
+        # 3. 透過管理員進入課程管理頁面，驗證有顯示 (yajusenpai)
+        self.client.force_login(self.admin_user)
+        res = self.client.get(reverse('pages:manage_courses'))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, '田所浩二')
+        self.assertContains(res, '(yajusenpai)')
+
+    def test_admin_delete_student_graduated(self):
+        """管理員以「已畢業」為由刪除學生帳號"""
+        self.client.force_login(self.admin_user)
+        stu = create_student_account(username='stu_grad', name='畢業生A', student_id='B110001')
+        user_id = stu.id
+
+        res = self.client.post(reverse('pages:delete_user'), {
+            'user_id': user_id,
+            'reason_type': '已畢業'
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(User.objects.filter(id=user_id).exists())
+        self.assertContains(res, '已成功刪除學生帳號【畢業生A】')
+        self.assertContains(res, '原因：已畢業')
+
+    def test_admin_delete_student_dropped_out(self):
+        """管理員以「已退學」為由刪除學生帳號"""
+        self.client.force_login(self.admin_user)
+        stu = create_student_account(username='stu_drop', name='退學生B', student_id='B110002')
+        user_id = stu.id
+
+        res = self.client.post(reverse('pages:delete_user'), {
+            'user_id': user_id,
+            'reason_type': '已退學'
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(User.objects.filter(id=user_id).exists())
+        self.assertContains(res, '已成功刪除學生帳號【退學生B】')
+        self.assertContains(res, '原因：已退學')
+
+    def test_admin_delete_user_other_reason(self):
+        """管理員以「其他」並附帶詳細說明刪除帳號"""
+        self.client.force_login(self.admin_user)
+        stu = create_student_account(username='stu_other', name='轉學生C', student_id='B110003')
+        user_id = stu.id
+
+        res = self.client.post(reverse('pages:delete_user'), {
+            'user_id': user_id,
+            'reason_type': '其他',
+            'reason_other': '轉學至他校'
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(User.objects.filter(id=user_id).exists())
+        self.assertContains(res, '原因：其他（轉學至他校）')
+
+    def test_admin_delete_user_other_without_explanation_rejected(self):
+        """選擇「其他」卻未填寫原因說明時，應被阻擋並保留帳號"""
+        self.client.force_login(self.admin_user)
+        stu = create_student_account(username='stu_no_reason', name='學生D', student_id='B110004')
+        user_id = stu.id
+
+        res = self.client.post(reverse('pages:delete_user'), {
+            'user_id': user_id,
+            'reason_type': '其他',
+            'reason_other': '   '
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(User.objects.filter(id=user_id).exists())
+        self.assertContains(res, '請填寫詳細說明')
+
+    def test_admin_delete_user_invalid_reason_rejected(self):
+        """未提供合法刪除原因時，應被阻擋並保留帳號"""
+        self.client.force_login(self.admin_user)
+        stu = create_student_account(username='stu_invalid', name='學生E', student_id='B110005')
+        user_id = stu.id
+
+        res = self.client.post(reverse('pages:delete_user'), {
+            'user_id': user_id,
+            'reason_type': '不喜歡'
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(User.objects.filter(id=user_id).exists())
+        self.assertContains(res, '請選擇刪除原因')
+
+    def test_admin_cannot_delete_self(self):
+        """管理員無法刪除自身的帳號"""
+        self.client.force_login(self.admin_user)
+        res = self.client.post(reverse('pages:delete_user'), {
+            'user_id': self.admin_user.id,
+            'reason_type': '已退學'
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(User.objects.filter(id=self.admin_user.id).exists())
+        self.assertContains(res, '無法刪除管理員帳號')
+
+    def test_non_admin_cannot_delete_user(self):
+        """非教務管理員（如一般學生）禁止呼叫刪除帳號功能 (403 Forbidden)"""
+        self.client.force_login(self.student_user)
+        victim = create_student_account(username='stu_victim', name='學生F')
+        res = self.client.post(reverse('pages:delete_user'), {
+            'user_id': victim.id,
+            'reason_type': '已退學'
+        })
+        self.assertEqual(res.status_code, 403)
+        self.assertTrue(User.objects.filter(id=victim.id).exists())
+
+    def test_delete_teacher_preserves_courses(self):
+        """刪除教師帳號時，該教師的課程應保留並將 teacher_user 設為 None"""
+        self.client.force_login(self.admin_user)
+        tea = create_teacher_account(username='tea_del', name='測試刪除師')
+        c = Course.objects.create(
+            code='TEA_DEL_01',
+            name='待保留課程',
+            teacher='測試刪除師',
+            teacher_user=tea,
+            classroom='電101',
+            credits=2
+        )
+        res = self.client.post(reverse('pages:delete_user'), {
+            'user_id': tea.id,
+            'reason_type': '其他',
+            'reason_other': '教師離職'
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(User.objects.filter(id=tea.id).exists())
+        # 課程依然存在
+        c.refresh_from_db()
+        self.assertIsNone(c.teacher_user)
+        self.assertEqual(c.name, '待保留課程')
+
 
 
 

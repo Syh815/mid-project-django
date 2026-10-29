@@ -4,10 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}資訊管理學系 網路選課系統 (資管一甲){% endblock %}</title>
+    <title>{% block title %}資訊管理學系 網路選課與課表系統{% endblock %}</title>
     <!-- 網站預覽圖片與 Favicon -->
     <link rel="icon" type="image/webp" href="{% static 'image/preview.webp' %}?v={% now 'U' %}">
-    <meta property="og:title" content="資訊管理學系 網路選課與課表系統 (資管一甲)">
+    <meta property="og:title" content="資訊管理學系 網路選課與課表系統">
     <meta property="og:description" content="國立大學 資訊管理學系 學生網路選課與課表系統">
     <meta property="og:image" content="{% static 'image/preview.webp' %}?v={% now 'U' %}">
     <!-- FontAwesome 6 Icons -->
@@ -556,6 +556,30 @@ body {
   white-space: nowrap;
 }
 
+.class-switcher-btn {
+  padding: 3px 12px;
+  font-size: 0.825rem;
+  font-weight: 700;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: all 0.2s;
+  color: #334155;
+  background: transparent;
+  display: inline-block;
+}
+
+.class-switcher-btn:hover {
+  background: #cbd5e1;
+  color: #0f172a;
+}
+
+.class-switcher-btn.active {
+  background: var(--univ-navy);
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+
 /* 空堂儲存格 */
 .empty-cell {
   background-color: #ffffff;
@@ -902,10 +926,10 @@ body {
     <header class="navbar">
         <div class="nav-container">
             <a href="{% url 'pages:index' %}" class="nav-brand">
-                <span class="brand-badge">MIS 1A</span>
+                <span class="brand-badge">MIS</span>
                 <span class="brand-title">
                     <i class="fa-solid fa-graduation-cap"></i>
-                    資訊管理學系 網路選課與課表系統 (資管一甲)
+                    資訊管理學系 網路選課與課表系統
                 </span>
             </a>
 
@@ -916,8 +940,10 @@ body {
                         <img src="{{ request.user.profile.avatar_url }}?v={% now 'U' %}" alt="頭像" class="user-avatar-nav">
                         {% if is_admin %}
                             <span><strong>{{ request.user.first_name|default:request.user.username }}</strong> (教務處管理員)</span>
+                        {% elif request.user.profile.role == 'TEACHER' %}
+                            <span><strong>{{ request.user.first_name|default:request.user.username }}</strong> 老師 (授課教師)</span>
                         {% else %}
-                            <span><strong>{{ request.user.first_name|default:"張家豪" }}</strong> (資管一甲)</span>
+                            <span><strong>{{ request.user.first_name|default:request.user.username }}</strong> ({{ request.user.profile.student_class|default:"資管一甲" }})</span>
                         {% endif %}
                     </div>
                     <a href="{% url 'pages:profile_settings' %}" class="btn-settings" title="個人設定">
@@ -961,7 +987,7 @@ body {
 
     <!-- 頁尾 -->
     <footer class="footer">
-        <p>國立大學 資訊管理學系 • 學生網路選課與課表系統 (資管一甲)</p>
+        <p>國立大學 資訊管理學系 • 學生網路選課與課表系統</p>
         <p style="margin-top: 0.25rem; color: #888888;">
             版權所有 &copy; 資訊管理學系 • 校務資訊整合系統
         </p>

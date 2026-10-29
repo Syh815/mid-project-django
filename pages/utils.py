@@ -10,6 +10,10 @@ def init_demo_data():
     admin_user.is_superuser = True
     admin_user.first_name = '教務處管理員'
     admin_user.save()
+    admin_profile, _ = UserProfile.objects.get_or_create(user=admin_user)
+    admin_profile.role = 'ADMIN'
+    admin_profile.save()
+    admin_user.refresh_from_db()
 
     # 建立或更新 student 帳號，學生姓名設定為「張家豪」（性別：男，班級：資管一甲）
     student_user, _ = User.objects.get_or_create(username='student')
@@ -20,14 +24,14 @@ def init_demo_data():
     student_user.save()
 
     student_profile, _ = UserProfile.objects.get_or_create(user=student_user)
+    student_profile.role = 'STUDENT'
     student_profile.gender = 'M'  # 張家豪是男生
     student_profile.student_id = 'B11305001'
     student_profile.student_class = '資管一甲'
     student_profile.save()
+    student_user.refresh_from_db()
 
-    # 清除舊課程資料以確保完全符合課表
-    Enrollment.objects.all().delete()
-    Course.objects.all().delete()
+    # 保留使用者自訂新增的課程與選課紀錄，不執行全表刪除
 
     # 資管一甲標準課表課程（完全依據課表圖片第二張之課程、教師、教室與節次）
     demo_courses = [
@@ -259,21 +263,105 @@ def init_demo_data():
             'description': '現代機器學習思維、生成式 AI 應用與演算法倫理探討。（管理員預設暫未開放）',
             'color_tag': 'orange'
         },
+        {
+            'code': 'HO101',
+            'name': 'Vtuber技術解析',
+            'teacher': '林俊杰',
+            'classroom': '電708',
+            'credits': 2,
+            'category': 'ELECTIVE',
+            'target_class': '資管一甲',
+            'day_of_week': 5,
+            'start_period': 5,
+            'end_period': 6,
+            'is_open_for_enrollment': True,
+            'max_students': 45,
+            'description': '透過Python深度解析Vtuber之面部追蹤技術，以及分享追V心得',
+            'color_tag': 'blue'
+        },
+        {
+            'code': 'EL6767',
+            'name': '中國傳統武術',
+            'teacher': '陳麒文',
+            'classroom': '藝406',
+            'credits': 2,
+            'category': 'ELECTIVE',
+            'target_class': '資管一甲',
+            'day_of_week': 5,
+            'start_period': 5,
+            'end_period': 6,
+            'is_open_for_enrollment': True,
+            'max_students': 45,
+            'description': '了解中國傳統武術之歷史和實際體驗教學。\r\n主要學習內容:中國武術簡史&流派、狗熊哆嗦毛、閃身步、浪子踢球等',
+            'color_tag': 'blue'
+        },
+        {
+            'code': 'HM101',
+            'name': '日本網路文化',
+            'teacher': '田所浩二',
+            'classroom': '藝401',
+            'credits': 1,
+            'category': 'ELECTIVE',
+            'target_class': '資管一甲',
+            'day_of_week': 5,
+            'start_period': 7,
+            'end_period': 7,
+            'is_open_for_enrollment': True,
+            'max_students': 35,
+            'description': '本課程探討日本網路次文化與迷因傳播，帶領學生分析昏睡紅茶、符號變異及下北澤等空間的社會脈絡，進行跨領域文本考察(喜',
+            'color_tag': 'blue'
+        },
     ]
 
-    for item in demo_courses:
-        Course.objects.create(**item)
+    # 刪除舊的 chenkw1 與 chenkw2 帳號（若存在）
+    User.objects.filter(username__in=['chenkw1', 'chenkw2']).delete()
 
-    # 將預設必修課全數登記給張家豪 (student)
-    required_courses = Course.objects.filter(category='REQUIRED')
-    for rc in required_courses:
-        Enrollment.objects.get_or_create(user=student_user, course=rc)
+    # 示範教師帳號（陳麒文 老師，預設密碼 teacher123）
+    chen = create_teacher_account('chenkw', '陳麒文', gender='M', password='teacher123')
+
+    for raw_item in demo_courses:
+        item = dict(raw_item)
+        if 'target_class' not in item:
+            item['target_class'] = '資管一甲'
+        # 將陳麒文老師任教之選修課程指定關聯至 chenkw
+        if item.get('teacher') == '陳麒文':
+            item['teacher_user'] = chen
+        code = item.pop('code')
+        Course.objects.update_or_create(code=code, defaults=item)
+
+    # 將預設必修課全數登記給所有資管一甲學生（含預設張家豪與現有已建立之學生帳號）
+    required_courses = list(Course.objects.filter(category='REQUIRED', target_class='資管一甲'))
+    students_in_1a = User.objects.filter(
+        is_staff=False,
+        profile__student_class='資管一甲'
+    ).exclude(profile__role__in=['TEACHER', 'ADMIN'])
+    for stu in students_in_1a:
+        for rc in required_courses:
+            Enrollment.objects.get_or_create(user=stu, course=rc)
 
     return admin_user, student_user
 
 
-def create_student_account(username, name, gender='M', password='student123', student_id=None):
-    """建立資管一甲學生帳號，設定性別與學號，並自動預載資管一甲的 10 門班級必修課程"""
+def create_teacher_account(username, name, gender='M', password='teacher123'):
+    """建立授課教師帳號"""
+    user, _ = User.objects.get_or_create(username=username)
+    user.set_password(password)
+    user.first_name = name
+    user.is_staff = False
+    user.is_superuser = False
+    user.save()
+
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    profile.role = 'TEACHER'
+    profile.gender = gender
+    profile.student_class = ''
+    profile.save()
+    user.refresh_from_db()
+    return user
+
+
+def create_student_account(username, name, gender='M', password='student123', student_id=None, student_class='資管一甲'):
+    """建立學生帳號，設定性別、學號與班級，並為資管一甲學生自動預載 10 門班級必修課程"""
     user = User.objects.create_user(
         username=username,
         password=password,
@@ -284,15 +372,19 @@ def create_student_account(username, name, gender='M', password='student123', st
     user.save()
 
     profile, _ = UserProfile.objects.get_or_create(user=user)
+    profile.role = 'STUDENT'
     profile.gender = gender
     profile.student_id = student_id or username
-    profile.student_class = '資管一甲'
+    profile.student_class = student_class or '資管一甲'
     profile.save()
 
-    # 自動預先登記資管一甲的所有必修課程
-    required_courses = Course.objects.filter(category='REQUIRED')
-    for rc in required_courses:
-        Enrollment.objects.get_or_create(user=user, course=rc)
+    # 若為資管一甲學生，自動預先登記資管一甲的所有必修課程
+    if profile.student_class == '資管一甲':
+        required_courses = Course.objects.filter(category='REQUIRED', target_class='資管一甲')
+        for rc in required_courses:
+            Enrollment.objects.get_or_create(user=user, course=rc)
 
+    user.refresh_from_db()
     return user
+
 

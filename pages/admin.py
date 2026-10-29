@@ -55,9 +55,9 @@ class CourseAdminForm(forms.ModelForm):
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
     form = CourseAdminForm
-    list_display = ('code', 'name', 'category', 'teacher', 'classroom', 'day_of_week', 'start_period', 'end_period', 'credits', 'is_open_for_enrollment')
-    list_filter = ('category', 'day_of_week', 'is_open_for_enrollment')
-    search_fields = ('code', 'name', 'teacher', 'classroom')
+    list_display = ('code', 'name', 'category', 'target_class', 'teacher', 'teacher_user', 'classroom', 'day_of_week', 'start_period', 'end_period', 'credits', 'is_open_for_enrollment')
+    list_filter = ('category', 'target_class', 'day_of_week', 'is_open_for_enrollment')
+    search_fields = ('code', 'name', 'teacher', 'classroom', 'teacher_user__username', 'teacher_user__first_name')
     list_editable = ('is_open_for_enrollment',)
 
 @admin.register(Enrollment)
@@ -75,13 +75,21 @@ except admin.sites.NotRegistered:
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
     can_delete = False
-    verbose_name = "學生個人資訊 / 學號設定"
-    verbose_name_plural = "學生個人資訊 / 學號設定"
+    verbose_name = "帳號個人資訊 / 角色與班級設定"
+    verbose_name_plural = "帳號個人資訊 / 角色與班級設定"
 
 @admin.register(User)
 class CustomUserAdmin(BaseUserAdmin):
     inlines = (UserProfileInline,)
-    list_display = ('username', 'first_name', 'get_student_id', 'get_gender', 'is_staff')
+    list_display = ('username', 'first_name', 'get_role', 'get_student_class', 'get_student_id', 'get_gender', 'is_staff')
+
+    @admin.display(description="角色")
+    def get_role(self, obj):
+        return obj.profile.get_role_display() if hasattr(obj, 'profile') else ''
+
+    @admin.display(description="班級")
+    def get_student_class(self, obj):
+        return obj.profile.student_class if hasattr(obj, 'profile') else ''
 
     @admin.display(description="學號")
     def get_student_id(self, obj):
@@ -93,9 +101,10 @@ class CustomUserAdmin(BaseUserAdmin):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'student_id', 'student_class', 'gender', 'updated_at')
-    list_editable = ('student_id',)
+    list_display = ('user', 'role', 'student_class', 'student_id', 'gender', 'updated_at')
+    list_editable = ('student_id', 'student_class', 'role')
     search_fields = ('user__username', 'user__first_name', 'student_id')
-    list_filter = ('student_class', 'gender')
+    list_filter = ('role', 'student_class', 'gender')
+
 
 

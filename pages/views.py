@@ -6,9 +6,10 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.http import require_POST
+from django.db.models import Q
 
 from .models import Course, Enrollment, UserProfile
-from .utils import init_demo_data, create_student_account
+from .utils import init_demo_data, create_student_account, create_teacher_account
 
 # 依據圖片第二張完整時段排程
 PERIOD_INFO = [
@@ -51,6 +52,10 @@ def index(request, tab=None):
         return redirect('pages:login')
 
     is_admin = request.user.is_staff or request.user.username == 'admin'
+    user_role = getattr(request.user.profile, 'role', 'STUDENT')
+    is_teacher = (user_role == 'TEACHER')
+    is_student = not is_admin and not is_teacher
+    student_class = getattr(request.user.profile, 'student_class', '資管一甲')
 
     # 若使用舊式 query string ?tab=...，自動 302 重新導向至乾淨語意化目錄路徑 (Clean Directory URLs)
     query_tab = request.GET.get('tab')
@@ -61,28 +66,51 @@ def index(request, tab=None):
             'timetable': 'pages:timetable',
             'admin_courses': 'pages:manage_courses',
             'students_roster': 'pages:students_roster',
+            'teacher_courses': 'pages:teacher_courses',
         }
         if query_tab in tab_redirect_map:
             return redirect(tab_redirect_map[query_tab])
 
-    active_tab = tab or ('admin_courses' if is_admin else 'timetable')
+    if not tab:
+        if is_admin:
+            active_tab = 'admin_courses'
+        elif is_teacher:
+            active_tab = 'teacher_courses'
+        else:
+            active_tab = 'timetable'
+    else:
+        active_tab = tab
 
-    # 取得所有課程與選課紀錄
-    all_courses = Course.objects.all().prefetch_related('enrollments')
+    # 取得所有課程與選課紀錄（含授課教師關聯與修課學生）
+    all_courses = Course.objects.all().select_related('teacher_user').prefetch_related('enrollments__user__profile')
 
     # 學生已選課程
-    if not is_admin:
+    if is_student:
         user_enrollments = Enrollment.objects.filter(user=request.user).select_related('course')
         enrolled_courses = [e.course for e in user_enrollments]
         enrolled_course_ids = {c.id for c in enrolled_courses}
     else:
-        enrolled_courses = list(all_courses)
-        enrolled_course_ids = {c.id for c in all_courses}
+        enrolled_courses = []
+        enrolled_course_ids = set()
+
+    # 班級課表切換 (資管一甲、資管二甲、資管三甲)
+    CLASS_LIST = ['資管一甲', '資管二甲', '資管三甲']
+    selected_class = request.GET.get('class_name', '').strip()
+    if not selected_class:
+        if is_student and student_class in CLASS_LIST:
+            selected_class = student_class
+        else:
+            selected_class = '資管一甲'
+    if selected_class not in CLASS_LIST:
+        selected_class = '資管一甲'
 
     # 建立課表網格 [period][day]
     timetable = {p['period']: {d['day']: None for d in DAYS_INFO} for p in PERIOD_INFO}
 
-    courses_to_plot = enrolled_courses if not is_admin else [c for c in all_courses if c.category == 'REQUIRED']
+    if is_student and selected_class == student_class:
+        courses_to_plot = enrolled_courses
+    else:
+        courses_to_plot = [c for c in all_courses if c.target_class == selected_class and c.category == 'REQUIRED']
 
     for course in courses_to_plot:
         day = course.day_of_week
@@ -102,23 +130,26 @@ def index(request, tab=None):
                 if p in timetable and day in timetable[p]:
                     timetable[p][day] = {'type': 'occupied'}
 
-    # 學生選修課程清單處理（計算衝堂狀態、選課狀態）
+    # 學生選修課程清單處理（計算衝堂狀態、選課狀態、班級相符狀態）
     elective_courses_data = []
     for c in all_courses:
         is_enrolled = c.id in enrolled_course_ids
         conflict_with = None
-        if not is_enrolled and not is_admin:
+        if not is_enrolled and is_student:
             for ec in enrolled_courses:
                 if check_time_conflict(c, ec):
                     conflict_with = ec
                     break
 
+        is_class_match = (c.target_class in ['ALL', student_class])
         elective_courses_data.append({
             'course': c,
             'is_enrolled': is_enrolled,
             'is_open': c.is_open_for_enrollment,
             'conflict_with': conflict_with,
             'is_full': c.current_enrolled_count >= c.max_students,
+            'target_class': c.target_class,
+            'is_class_match': is_class_match,
         })
 
     # 學分統計（學生端）
@@ -130,19 +161,46 @@ def index(request, tab=None):
     total_courses_count = all_courses.count()
     open_courses_count = all_courses.filter(is_open_for_enrollment=True).count()
 
-    # 取得現有與預設所有教師名單（供新增/編輯課程時打字或下拉選擇）
+    # 取得現有所有教師帳號與教師清單
+    all_teacher_users = User.objects.filter(profile__role='TEACHER').select_related('profile').order_by('username')
     default_teachers = [
         '黃燕萍', '李俞麟', '唐日新', '林俊杰', '丁慧瑩',
         '謝文欽', '陳秋良', '許佩玉', '顏嬿真', '王嬿惠',
-        '葉明貴', '郭怡君'
+        '葉明貴', '郭怡君', '陳麒文'
     ]
     db_teachers = list(Course.objects.values_list('teacher', flat=True).distinct())
-    teachers_list = sorted(list({t.strip() for t in (default_teachers + db_teachers) if t and t.strip()}))
+    teacher_user_names = list(all_teacher_users.values_list('first_name', flat=True))
+    teachers_list = sorted(list({t.strip() for t in (default_teachers + db_teachers + teacher_user_names) if t and t.strip()}))
 
-    # 學生名冊（管理員端查看與管理資管一甲學生）
+    # 教師端：自己開的課程與修課學生清單
+    teacher_courses = []
+    if is_teacher or is_admin:
+        if is_teacher:
+            t_courses_query = all_courses.filter(
+                Q(teacher_user=request.user) | Q(teacher=request.user.first_name, teacher_user__isnull=True)
+            )
+        else:
+            t_courses_query = all_courses
+
+        for tc in t_courses_query:
+            enrolled_stus = []
+            for enr in tc.enrollments.all():
+                enrolled_stus.append({
+                    'user': enr.user,
+                    'profile': getattr(enr.user, 'profile', None),
+                    'enrolled_at': enr.created_at,
+                })
+            teacher_courses.append({
+                'course': tc,
+                'enrolled_students': enrolled_stus,
+                'student_count': len(enrolled_stus),
+            })
+
+    # 學生名冊與教師名冊（管理員端查看與管理）
     students_list = []
+    teachers_admin_list = []
     if is_admin:
-        students_query = User.objects.filter(is_staff=False).select_related('profile').prefetch_related('enrollments__course').order_by('username')
+        students_query = User.objects.filter(is_staff=False, profile__role='STUDENT').select_related('profile').prefetch_related('enrollments__course').order_by('username')
         for stu in students_query:
             enr_courses = [e.course for e in stu.enrollments.all()]
             req_c = sum(c.credits for c in enr_courses if c.category == 'REQUIRED')
@@ -157,14 +215,29 @@ def index(request, tab=None):
                 'enrolled_courses': enr_courses,
             })
 
+        for tu in all_teacher_users:
+            taught = [c for c in all_courses if c.teacher_user_id == tu.id or (c.teacher == tu.first_name and c.teacher_user_id is None)]
+            teachers_admin_list.append({
+                'user': tu,
+                'profile': getattr(tu, 'profile', None),
+                'taught_courses': taught,
+                'courses_count': len(taught),
+            })
+
     context = {
         'is_admin': is_admin,
+        'is_teacher': is_teacher,
+        'is_student': is_student,
+        'student_class': student_class,
+        'class_list': CLASS_LIST,
+        'selected_class': selected_class,
         'period_info': PERIOD_INFO,
         'days_info': DAYS_INFO,
         'timetable': timetable,
         'all_courses': all_courses,
         'enrolled_courses': enrolled_courses,
         'elective_courses_data': elective_courses_data,
+        'teacher_courses': teacher_courses,
         'total_credits': total_credits,
         'required_credits': required_credits,
         'elective_credits': elective_credits,
@@ -172,6 +245,8 @@ def index(request, tab=None):
         'total_courses_count': total_courses_count,
         'open_courses_count': open_courses_count,
         'teachers_list': teachers_list,
+        'all_teacher_users': all_teacher_users,
+        'teachers_admin_list': teachers_admin_list,
         'students_list': students_list,
         'tab': active_tab,
     }
@@ -194,10 +269,12 @@ def login_view(request):
             messages.success(request, f"登入成功！歡迎 {display_name} 進入系統。")
             if user.is_staff or user.username == 'admin':
                 return redirect('pages:manage_courses')
+            elif getattr(user.profile, 'role', '') == 'TEACHER':
+                return redirect('pages:teacher_courses')
             else:
                 return redirect('pages:timetable')
         else:
-            messages.error(request, "帳號或密碼輸入錯誤，請重新登入！(學生: student / student123；管理員: admin / admin123)")
+            messages.error(request, "帳號或密碼輸入錯誤，請重新登入！(學生: student / student123；管理員: admin / admin123；教師: chenkw / teacher123)")
 
     return render(request, 'login.html')
 
@@ -215,9 +292,21 @@ def enroll_course(request, course_id):
     """學生加選額外課程"""
     course = get_object_or_404(Course, id=course_id)
 
+    # 檢查身分：僅學生可自主選課
+    user_role = getattr(request.user.profile, 'role', 'STUDENT')
+    if user_role == 'TEACHER' or request.user.is_staff:
+        messages.error(request, "僅學生身分可進行自主選修課程！")
+        return redirect('pages:electives')
+
     # 檢查是否開放選修
     if not course.is_open_for_enrollment:
-        messages.error(request, f"選課失敗：【{course.name}】目前教務端未開放學生選修！")
+        messages.error(request, f"選課失敗：【{course.name}】目前授課教師或教務端未開放學生選修！")
+        return redirect('pages:electives')
+
+    # 檢查班級限制：學生只能選自己班級（或 ALL 全系開放）的課程
+    user_class = getattr(request.user.profile, 'student_class', '資管一甲')
+    if course.target_class not in ['ALL', user_class]:
+        messages.error(request, f"選課失敗：【{course.name}】為【{course.target_class}】限定選修課程，您所屬班級為【{user_class}】無法加選！")
         return redirect('pages:electives')
 
     # 檢查是否已經選修
@@ -273,17 +362,28 @@ def drop_course(request, course_id):
 @login_required
 @require_POST
 def toggle_course_status(request, course_id):
-    """管理員切換課程是否開放選修"""
-    if not (request.user.is_staff or request.user.username == 'admin'):
-        return HttpResponseForbidden("僅教務管理員可調整課程開放狀態。")
-
+    """管理員或授課教師切換課程是否開放選修"""
     course = get_object_or_404(Course, id=course_id)
+    is_admin = request.user.is_staff or request.user.username == 'admin'
+    user_role = getattr(request.user.profile, 'role', 'STUDENT')
+    is_course_teacher = (user_role == 'TEACHER') and (
+        course.teacher_user == request.user or (course.teacher == request.user.first_name and course.teacher_user is None)
+    )
+
+    if not (is_admin or is_course_teacher):
+        return HttpResponseForbidden("僅教務管理員或該課程之授課教師可調整課程開放狀態。")
+
     course.is_open_for_enrollment = not course.is_open_for_enrollment
     course.save()
 
     status_str = "【開放學生選修】" if course.is_open_for_enrollment else "【未開放選修】"
     messages.success(request, f"已更新課程【{course.name}】狀態為：{status_str}")
 
+    next_url = request.POST.get('next') or request.META.get('HTTP_REFERER')
+    if next_url:
+        return redirect(next_url)
+    if is_course_teacher and not is_admin:
+        return redirect('pages:teacher_courses')
     return redirect('pages:manage_courses')
 
 
@@ -297,6 +397,11 @@ def add_course(request):
     code = request.POST.get('code', '').strip().upper()
     name = request.POST.get('name', '').strip()
     teacher = request.POST.get('teacher', '').strip()
+    teacher_user_id = request.POST.get('teacher_user_id', '').strip()
+    target_class = request.POST.get('target_class', '資管一甲').strip()
+    if target_class not in ['資管一甲', '資管二甲', '資管三甲', 'ALL']:
+        target_class = '資管一甲'
+
     classroom = request.POST.get('classroom', '').strip()
     credits = int(request.POST.get('credits', 2))
     category = request.POST.get('category', 'ELECTIVE')
@@ -320,10 +425,20 @@ def add_course(request):
         messages.error(request, f"新增失敗：課程代碼【{code}】已存在！")
         return redirect('pages:manage_courses')
 
+    teacher_user = None
+    if teacher_user_id:
+        teacher_user = User.objects.filter(id=teacher_user_id).first()
+        if teacher_user:
+            teacher = teacher_user.first_name or teacher_user.username
+    elif teacher:
+        teacher_user = User.objects.filter(first_name=teacher, profile__role='TEACHER').first()
+
     Course.objects.create(
         code=code,
         name=name,
         teacher=teacher or "未指定",
+        teacher_user=teacher_user,
+        target_class=target_class,
         classroom=classroom or "未指定",
         credits=credits,
         category=category,
@@ -336,7 +451,7 @@ def add_course(request):
         color_tag=color_tag
     )
 
-    messages.success(request, f"成功新增課程：【{name}】（代碼: {code}）！")
+    messages.success(request, f"成功新增課程：【{name}】（代碼: {code}，開課班級: {target_class}）！")
     return redirect('pages:manage_courses')
 
 
@@ -351,6 +466,11 @@ def edit_course(request, course_id):
 
     name = request.POST.get('name', '').strip()
     teacher = request.POST.get('teacher', '').strip()
+    teacher_user_id = request.POST.get('teacher_user_id', '').strip()
+    target_class = request.POST.get('target_class', course.target_class).strip()
+    if target_class not in ['資管一甲', '資管二甲', '資管三甲', 'ALL']:
+        target_class = '資管一甲'
+
     classroom = request.POST.get('classroom', '').strip()
     credits = int(request.POST.get('credits', course.credits))
     category = request.POST.get('category', course.category)
@@ -370,8 +490,23 @@ def edit_course(request, course_id):
         messages.error(request, "編輯失敗：結束節次不能小於開始節次！")
         return redirect('pages:manage_courses')
 
+    if teacher_user_id:
+        teacher_user = User.objects.filter(id=teacher_user_id).first()
+        if teacher_user:
+            course.teacher_user = teacher_user
+            course.teacher = teacher_user.first_name or teacher_user.username
+    elif 'teacher_user_id' in request.POST and not teacher_user_id:
+        course.teacher_user = None
+        if teacher:
+            course.teacher = teacher
+    else:
+        if teacher:
+            course.teacher = teacher
+            if not course.teacher_user:
+                course.teacher_user = User.objects.filter(first_name=teacher, profile__role='TEACHER').first()
+
     course.name = name
-    course.teacher = teacher or course.teacher
+    course.target_class = target_class
     course.classroom = classroom or course.classroom
     course.credits = credits
     course.category = category
@@ -473,12 +608,15 @@ def profile_settings(request):
 @login_required
 @require_POST
 def add_student(request):
-    """教務管理員新增資管一甲學生帳號"""
+    """教務管理員新增學生帳號（可指定資管一甲至三甲）"""
     if not (request.user.is_staff or request.user.username == 'admin'):
         return HttpResponseForbidden("僅教務管理員可新增學生帳號。")
 
     username = request.POST.get('username', '').strip()
     name = request.POST.get('name', '').strip()
+    student_class = request.POST.get('student_class', '資管一甲').strip()
+    if student_class not in ['資管一甲', '資管二甲', '資管三甲']:
+        student_class = '資管一甲'
     gender = request.POST.get('gender', 'M').strip()
     if gender not in ['M', 'F', 'O']:
         gender = 'M'
@@ -498,13 +636,14 @@ def add_student(request):
         name=name,
         gender=gender,
         password=password,
-        student_id=student_id
+        student_id=student_id,
+        student_class=student_class
     )
 
     gender_display = student_user.profile.get_gender_display()
     messages.success(
         request,
-        f"成功新增資管一甲學生：【{name}】（帳號: {username}，性別: {gender_display}）！預設密碼為 {password}，已自動預載資管一甲班級必修課表。"
+        f"成功新增學生：【{name}】（帳號: {username}，班級: {student_class}，性別: {gender_display}）！預設密碼為 {password}。"
     )
     return redirect('pages:students_roster')
 
@@ -512,12 +651,13 @@ def add_student(request):
 @login_required
 @require_POST
 def edit_student_id(request, user_id):
-    """教務管理員修改學生學號"""
+    """教務管理員修改學生學號與所屬班級"""
     if not (request.user.is_staff or request.user.username == 'admin'):
-        return HttpResponseForbidden("僅教務管理員可修改學生學號。")
+        return HttpResponseForbidden("僅教務管理員可修改學生資料。")
 
     target_user = get_object_or_404(User, id=user_id)
     new_student_id = request.POST.get('student_id', '').strip()
+    new_student_class = request.POST.get('student_class', '').strip()
 
     if not new_student_id:
         messages.error(request, "修改失敗：學生學號不可為空白！")
@@ -533,15 +673,108 @@ def edit_student_id(request, user_id):
         return redirect('pages:students_roster')
 
     profile, _ = UserProfile.objects.get_or_create(user=target_user)
-    old_student_id = profile.student_id or target_user.username
     profile.student_id = new_student_id
+    if new_student_class in ['資管一甲', '資管二甲', '資管三甲']:
+        profile.student_class = new_student_class
     profile.save()
 
     student_name = target_user.first_name if target_user.first_name else target_user.username
     messages.success(
         request,
-        f"成功將學生【{student_name}】（帳號: {target_user.username}）的學號更新為【{new_student_id}】！"
+        f"成功將學生【{student_name}】（帳號: {target_user.username}）的資料更新為：學號【{new_student_id}】、班級【{profile.student_class}】！"
     )
     return redirect('pages:students_roster')
+
+
+@login_required
+@require_POST
+def add_teacher(request):
+    """教務管理員新增教師帳號"""
+    if not (request.user.is_staff or request.user.username == 'admin'):
+        return HttpResponseForbidden("僅教務管理員可新增教師帳號。")
+
+    username = request.POST.get('username', '').strip()
+    name = request.POST.get('name', '').strip()
+    gender = request.POST.get('gender', 'M').strip()
+    if gender not in ['M', 'F', 'O']:
+        gender = 'M'
+    password = request.POST.get('password', '').strip() or 'teacher123'
+
+    if not username or not name:
+        messages.error(request, "新增失敗：教師帳號與姓名為必填項目！")
+        return redirect('pages:students_roster')
+
+    if User.objects.filter(username=username).exists():
+        messages.error(request, f"新增失敗：帳號【{username}】已被使用，請更換帳號！")
+        return redirect('pages:students_roster')
+
+    teacher_user = create_teacher_account(
+        username=username,
+        name=name,
+        gender=gender,
+        password=password
+    )
+
+    # 自動關聯現有由該教師授課之課程
+    Course.objects.filter(teacher=name, teacher_user__isnull=True).update(teacher_user=teacher_user)
+
+    messages.success(
+        request,
+        f"成功新增教師：【{name}】（帳號: {username}）！預設密碼為 {password}，已可指派授課課程或登入系統管理開課。"
+    )
+    return redirect('pages:students_roster')
+
+
+@login_required
+@require_POST
+def delete_user(request):
+    """教務管理員刪除帳號（需指定原因：已退學、已畢業、其他:請說明）"""
+    if not (request.user.is_staff or request.user.username == 'admin'):
+        return HttpResponseForbidden("僅教務管理員可刪除帳號。")
+
+    user_id = request.POST.get('user_id', '').strip()
+    reason_type = request.POST.get('reason_type', '').strip()
+    reason_other = request.POST.get('reason_other', '').strip()
+
+    if not user_id:
+        messages.error(request, "刪除失敗：未指定欲刪除之帳號！")
+        return redirect('pages:students_roster')
+
+    target_user = get_object_or_404(User, id=user_id)
+
+    # 禁止刪除自身、admin 或具管理員權限者
+    if target_user.id == request.user.id or target_user.username == 'admin' or target_user.is_superuser or target_user.is_staff:
+        messages.error(request, "刪除失敗：無法刪除管理員帳號！")
+        return redirect('pages:students_roster')
+
+    # 原因驗證
+    valid_reasons = ['已退學', '已畢業', '其他']
+    if reason_type not in valid_reasons:
+        messages.error(request, "刪除失敗：請選擇刪除原因（已退學、已畢業、或其他）！")
+        return redirect('pages:students_roster')
+
+    if reason_type == '其他' and not reason_other:
+        messages.error(request, "刪除失敗：若選擇「其他」，請填寫詳細說明！")
+        return redirect('pages:students_roster')
+
+    reason_str = f"其他（{reason_other}）" if reason_type == '其他' else reason_type
+    target_name = target_user.first_name or target_user.username
+    target_username = target_user.username
+    target_role = "學生"
+    if hasattr(target_user, 'profile') and target_user.profile.role == 'TEACHER':
+        target_role = "教師"
+
+    # 若為教師，解除其開課綁定，避免刪除課程本身
+    Course.objects.filter(teacher_user=target_user).update(teacher_user=None)
+
+    # 執行刪除
+    target_user.delete()
+
+    messages.success(
+        request,
+        f"已成功刪除{target_role}帳號【{target_name}】（帳號: {target_username}），原因：{reason_str}。"
+    )
+    return redirect('pages:students_roster')
+
 
 

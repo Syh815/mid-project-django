@@ -17,12 +17,21 @@ class Course(models.Model):
         (5, '星期五'),
     ]
 
+    CLASS_CHOICES = [
+        ('資管一甲', '資管一甲'),
+        ('資管二甲', '資管二甲'),
+        ('資管三甲', '資管三甲'),
+        ('ALL', '全系/不限班級'),
+    ]
+
     code = models.CharField(max_length=20, unique=True, verbose_name="課程代碼")
     name = models.CharField(max_length=100, verbose_name="課程名稱")
     teacher = models.CharField(max_length=50, verbose_name="授課教師")
+    teacher_user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='taught_courses', verbose_name="授課教師帳號")
     classroom = models.CharField(max_length=50, verbose_name="上課教室")
     credits = models.PositiveIntegerField(default=2, verbose_name="學分數")
     category = models.CharField(max_length=10, choices=CATEGORY_CHOICES, default='ELECTIVE', verbose_name="課程屬性")
+    target_class = models.CharField(max_length=20, choices=CLASS_CHOICES, default='資管一甲', verbose_name="開課班級")
     day_of_week = models.PositiveSmallIntegerField(choices=DAY_CHOICES, default=1, verbose_name="上課星期")
     start_period = models.PositiveSmallIntegerField(default=1, verbose_name="開始節次")
     end_period = models.PositiveSmallIntegerField(default=1, verbose_name="結束節次")
@@ -54,6 +63,17 @@ class Course(models.Model):
     def current_enrolled_count(self):
         return self.enrollments.count()
 
+    @property
+    def display_teacher_username(self):
+        """若有綁定 teacher_user 則顯示其 username，若尚未綁定但同名教師帳號存在則自動對應"""
+        if self.teacher_user:
+            return self.teacher_user.username
+        if self.teacher:
+            match = User.objects.filter(first_name=self.teacher, profile__role='TEACHER').first()
+            if match:
+                return match.username
+        return ""
+
 
 class Enrollment(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='enrollments', verbose_name="選課學生")
@@ -76,7 +96,14 @@ class UserProfile(models.Model):
         ('O', '其他'),
     ]
 
+    ROLE_CHOICES = [
+        ('STUDENT', '學生'),
+        ('TEACHER', '教師'),
+        ('ADMIN', '教務管理員'),
+    ]
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile', verbose_name="使用者帳號")
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='STUDENT', verbose_name="身分角色")
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES, default='M', verbose_name="性別")
     student_id = models.CharField(max_length=20, blank=True, default="", verbose_name="學號")
     student_class = models.CharField(max_length=50, default="資管一甲", verbose_name="班級")
