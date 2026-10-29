@@ -1,283 +1,33 @@
-#  國立大學 資訊管理學系 網路選課與動態課表系統 (開放資管一至三甲)
+# 國立大學 資訊管理學系 網路選課與動態課表系統
 
->  **嚴正聲明 (Solemn Disclaimer)**  
-> *This project was (definitely) NOT created by Gemini and Antigravity.*  
-> 　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　—— by **SYH**
+> **嚴正聲明**：*This project was (definitely) NOT created by Gemini and Antigravity.* —— by **SYH**
 
 ---
 
-> 本專案為以 **Django 5.2** 與 **Python 3.15** 打造的現代化校務選課與動態課表管理系統。外觀復刻經典**2020校務行政系統風格**，內在搭載**智慧衝堂偵測**、**動態跨節課表**、**教務管理後台**、**教師專屬授課與修課學生名冊管理**、**全系一至三甲課表切換與跨班選修防護**與**一鍵示範資料重置**等強大功能。
+### 系統特色
+- **九節制動態課表**：跨節自動合併 (`rowspan`)，支援資管一至三甲課表查詢與跨班選修防護。
+- **智慧選課引擎**：即時衝堂偵測防護、側邊快速選修抽屜、加退選人數上限即時控管。
+- **教務與教師開課管理**：
+  - **教務管理員**：課程維護、選修開關、調整學生班級/學號、刪除帳號（需選退學/畢業/其他原因）。
+  - **授課教師**：自主新增開課（自動同步至教務總表與學生選修清單）、管理修課名單、選修狀態開關。
+  - **同名教師支援**：獨立帳號與授課隔離（如 `陳麒文 (chenkw)` 與 `田所浩二 (yajusenpai)`）。
 
 ---
 
-##  目錄 (Table of Contents)
+### 預設測試帳號
 
-1. [專案亮點與核心特色](#-專案亮點與核心特色)
-2. [預設帳號與權限說明](#-預設帳號與權限說明)
-3. [課表與課程規劃](#-課表與課程規劃)
-4. [技術棧與架構](#-技術棧與架構)
-5. [快速開始指南](#-快速開始指南)
-6. [專案目錄結構](#-專案目錄結構)
-7. [單元測試與品質驗證](#-單元測試與品質驗證)
-8. [常見問題與彩蛋 (FAQ)](#-常見問題與彩蛋-faq)
+| 角色 | 帳號 | 密碼 | 姓名 | 說明 |
+| :--- | :--- | :--- | :--- | :--- |
+| **教務管理員** | `admin` | `admin123` | 管理員 | 課程維護、學生班級調整、刪除帳號、重設資料庫 |
+| **一般學生** | `student` | `student123` | 張家豪 | 個人課表、選修加退選、一至三甲課表查詢 |
+| **授課教師** | `chenkw` | `teacher123` | 陳麒文 | 授課管理、自主開課、修課學生名冊 |
+| **授課教師** | `yajusenpai` | `teacher123` | 田所浩二 | 教授《日本網路文化》(HM101)、自主開課 |
 
 ---
 
-##  專案亮點與核心特色
+### 快速啟動
+- **Windows 一鍵啟動**：雙擊 `start_server.bat`（關閉請雙擊 `stop_server.bat`）。
+- **手動啟動**：啟用虛擬環境後執行 `python manage.py runserver 0.0.0.0:8000`。
+- **品質驗證**：執行 `python manage.py test`（30 項單元測試全數通過）。
 
-### 1. 九節制動態週課表 (Timetable Matrix)
-- **標準節次排程**：完整支援週一至週五，第 1 節至第 9 節（`08:10 ~ 18:05`）的時間劃分。
-- **跨節自適應合併 (`rowspan`)**：連續時段的課程自動整合為單一色塊卡片，版面清晰不重複。
-- **身分視圖自適應**：
-  - **學生視角**：顯示「個人已選之必修與選修課表」，並顯示總學分與即時時段。
-  - **教務視角**：展示「全系標準必修排程總表」，便於教務人員統籌排課。
-
-### 2. 智慧選課與衝堂防護 (Time Conflict Prevention)
-- **實時衝堂判定**：選課引擎會主動計算候選課程與已選課程的時段重疊區間。
-- **視覺化衝堂標籤**：於選課列表中直接標記衝突科目（如 `衝堂：資訊管理導論 (週一 2-4節)`），防止學生誤選。
-- **嚴謹後端校驗**：即使透過 API 或快捷列嘗試選課，後端亦會嚴格攔截並反饋警示訊息。
-- **人數上限控管**：自動計算目前選修人數（`current_enrolled_count` / `max_students`），額滿時即時停選。
-
-###  3. 教務管理模式 (Admin Course Portal)
-- **即時選課開關**：教務人員可隨時一鍵「開放/關閉」特定選修課程供學生選課。
-- **課程 CRUD 完整維護**：支援教務人員新增、編輯（教師、教室、節次、學分、代表色）、刪除課程。
-- **一鍵重設資料庫 (`reset-database`)**：前台與後台皆提供資料庫重置功能，秒級還原資管一甲標準課表與預設帳號。
-
-###  4. 快速選課抽屜 (FastChoose Drawer)
-- 整合於首頁側邊/底部的快速選修抽屜，方便學生迅速瀏覽開放課程、剩餘名額與課程大綱，支援無縫加退選。
-
-### 5. 個人化檔案設定 (Profile & Avatar)
-- **自訂頭像上傳**：支援頭像檔案上傳、即時圖片預覽與安全儲存（`media/avatars/`）。
-- **帳號密碼維護**：提供密碼變更功能，並使用 Django 安全雜湊機制 (`update_session_auth_hash`)。
-
-### 6. 語意化目錄路徑與階層導航 (Clean Semantic Directory & Breadcrumb)
-- **告別醜陋查詢參數**：全面淘汰 `?tab=enrolled` 舊式 query string，改採直覺優雅的目錄結構：
-  - `/timetable/`：我的週課表
-  - `/electives/`：額外選修加選區
-  - `/enrolled/`：已選課程明細
-  - `/teacher/courses/`：授課教師開課與修課學生名冊
-  - `/manage/courses/`：全系課程維護與選修開關
-  - `/manage/students/`：學生與教師名冊統計
-- **無刷新 SPA 體驗 (HTML5 History API)**：切換頁籤即時切換內容，網址列無延遲平滑同步，完整支援瀏覽器上一頁/下一頁。
-- **經典校務階層麵包屑**：頂部明確標示「目前目錄位置：首頁 ❯ 學生網路選課 ❯ 已選課程明細」及語意化目錄徽章。
-- **完全向下相容**：造訪舊式 `/?tab=enrolled` 時自動 302 重導向至 `/enrolled/`，兼顧書籤相容性。
-
-### 7. 學生帳號管理、學號與班級調整 (Student Accounts & Class Adjustment)
-- **新增學生帳號**：教務管理員可於「學生與教師名冊」分頁一鍵新增學生帳號（輸入姓名、性別、帳號、學號、所屬班級、密碼）。
-- **調整學生學號與所屬班級**：教務管理員可於名冊點選任一學生的「修改學號 / 班級」按鈕，即時調整學號或將學生調整至「資管一甲」、「資管二甲」或「資管三甲」；亦可於 Django 管理後台 (`/admin/`) 直接編輯。
-- **自動預載必修課表**：新增資管一甲學生時，系統自動預先登記資管一甲全部 10 門班級必修課程。
-
-### 8. 開放資管一至三甲課表查詢與跨班選修限制 (Multi-Class Timetable & Restricted Electives)
-- **全校/全系開放三班課表查詢**：任何登入的使用者（學生、教師、管理員）皆可在「週課表」頂部透過「班級課表切換器」自由切換查閱**資管一甲**、**資管二甲**、**資管三甲**每週課表（二甲、三甲目前暫無課程，貼心提示「編排中」）。
-- **選修課程班級限定保護**：選修課程設定開課班級（`target_class`），學生**僅能加選自己所屬班級的選修課程**。若嘗試加選其他班級之選修課，系統將於前端停用按鈕並於後端攔截警示（例如：`為【資管二甲】限定選修課程，您所屬班級為【資管一甲】無法加選！`）。
-- **頂部與登入頁面去單一班級標籤**：系統導覽列與登入畫面已移除原先限定的 `(資管一甲)` 字樣，正式邁入全系多班級模式。
-
-### 9. 管理員創建教師帳號與教師授課管理 (Teacher Accounts & Same-Name Support)
-- **管理員創建教師帳號**：教務管理員可在「學生與教師名冊」分頁點選「新增教師帳號」，輸入教師帳號、姓名、性別、登入密碼，迅速開通教師權限。
-- **同名同姓老師隔離管理 ("陳麒文" 為同名同姓不同人)**：課程透過 `teacher_user` 外鍵與教師帳號建立實體關聯。系統預設建立了教師帳號（`chenkw`，姓名為「陳麒文」，預設密碼 `teacher123`），管理員若日後建立同名同姓之教師帳號，每位老師亦將各自獨立管理自己名下的課程與學生，互不干擾。
-- **教師專屬授課專區 (`/teacher/courses/`)**：
-  - 登入自動引導至「我的授課課程與修課學生」。
-  - 即時瀏覽自己開立的全部課程、上課時段、教室與修課人數。
-  - 展開「選課修讀學生名冊」，完整掌握修課學生的學號、姓名、所屬班級、性別與加選時間。
-  - 授課教師可直接一鍵切換自己所開課程的「開放/未開放選修」狀態，非授課教師無法竄改他人課程。
-
-### 10. 管理員刪除帳號功能（需指定原因）與課程授課教師帳號顯示
-- **管理員刪除帳號（學生與教師）**：
-  - 教務管理員可於「學生與教師名冊」中，針對學生或教師名冊點選「刪除帳號」按鈕。
-  - 彈出確認視窗，要求**強制選取刪除原因**：
-    1. **已退學**（學生退學離校或註銷學籍）
-    2. **已畢業**（學生修畢規定學分畢業）
-    3. **其他**（選取後展開文字框，**必須填寫詳細說明**，如教師離職、轉學、重複建檔等）
-  - **安全性與防護機制**：
-    - 禁止管理員自我刪除或刪除 `admin` 帳號。
-    - 嚴格阻擋未填寫說明之「其他」請求。
-    - 刪除教師帳號時，自動解除課程的教師帳號綁定（`teacher_user=None`），確保課程與選課紀錄完整保留。
-- **課程清單教師帳號即時顯示**：
-  - 課程管理列表之授課教師欄位，若授課教師具備系統帳號（如 `陳麒文` 對應 `chenkw`、`田所浩二` 對應 `yajusenpai`），姓名下方自動顯示帳號名稱 `(username)`。
-  - 支援動態屬性 `display_teacher_username`，無論是新增課程、編輯課程或事後建立教師帳號，皆能精確對應顯示。
-
----
-
-##  預設帳號與權限說明
-
-系統啟動或重置資料庫後，內建以下預設角色帳號：
-
-| 角色類型 | 帳號 (`Username`) | 密碼 (`Password`) | 預設姓名 | 性別 | 所屬班級 / 身分 | 權限範圍 |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **教務管理員** | `admin` | `admin123` | 教務處管理員 | - | - | 課程/學生/教師新增與刪除(需選原因)、學生班級調整、選課開關、重設全站資料庫 |
-| **一般學生** | `student` | `student123` | 張家豪 | **男** | **資管一甲** | 個人課表、查閱一至三甲課表、限選本班選修課加退選、個人頭像設定 |
-| **授課教師** | `chenkw` | `teacher123` | **陳麒文** | **男** | 授課教師 | 檢視個人授課、修課學生名冊、獨立開關自己課程選修、查閱全系課表 |
-| **授課教師** | `yajusenpai` | `teacher123` | **田所浩二** | **男** | 授課教師 | 教授《日本網路文化》(HM101)，支援課程名下帳號即時顯示 |
-
->  **自動重導向**：未登入之訪客造訪任何系統路徑，皆會自動安全跳轉至登入頁面（`/login/`）。學生登入預設進入課表，教師登入預設進入授課專區，管理員預設進入課程管理。
-
----
-
-##  課表與課程規劃
-
-系統預載標準「資管一甲」課表，並收錄多門特色選修課程：
-
-###  預載必修課程（學生帳號預設已選入）
-- **資訊管理導論**（黃燕萍 老師｜週一 2~4 節｜電708 承曦樓）
-- **體育三(上)**（李俞麟 老師｜週一 5~6 節｜藝406）
-- **電子商務**（唐日新 老師｜週二 2~4 節｜藝406）
-- **網站應用程式設計與實習**（林俊杰 老師｜週二 5~7 節｜電708 承曦樓）
-- **系統分析與設計(上)與實習**（丁慧瑩 老師｜週三 2~4 節｜藝406）
-- **電腦網路(上)**（謝文欽 老師｜週三 5~6 節｜資401）
-- **微積分(上)**（陳秋良 老師｜週三 7~9 節｜藝406）
-- **國文(三)(上)**（許佩玉 老師｜週四 2~4 節｜藝406）
-- **英語會話(二)(上)與實習**（顏嬿真 老師｜週四 5~6 節｜藝406）
-- **英文(三)(上)**（王嬿惠 老師｜週五 2~4 節｜藝406）
-
-###  熱門選修課程 (預設)
-- **中國傳統武術**（陳麒文 老師｜週五 5~6 節｜藝406｜2學分）
-- **日本網路文化**（田所浩二 老師｜週五 第 7 節｜藝401｜1學分）
-- **Vtuber技術解析**（林俊杰 老師｜週五 5~6 節｜電708 承曦樓｜2學分）
-- **Linux基礎教學**（葉明貴 老師｜週五 5~6 節｜電708 承曦樓）
-- **基礎日文(一)**（良本蕙莉 老師｜週四 7~8 節｜藝406）
-- **多媒體導論**（郭怡君 老師｜週二 8~9 節｜電708 承曦樓）
-- **多益輔導與聽力測驗**（王嬿惠 老師｜週五 7~8 節｜藝406）
-- **人工智慧通識導論**（謝文欽 老師｜週三 第 1 節｜預設教務關閉，供測試開關功能）
-
----
-
-##  技術棧與架構
-
-```mermaid
-graph TD
-    Client["瀏覽器 (Client)"] --> WebUI["經典校務行政風格 UI (HTML5 + CSS + FontAwesome 6)"]
-    WebUI --> DjangoViews["Django Views & Routing (pages app)"]
-    DjangoViews --> Auth["Django Auth & Permissions (admin / student)"]
-    DjangoViews --> Engine["選課邏輯與衝堂檢驗引擎 (check_time_conflict)"]
-    DjangoViews --> DB[(SQLite3 Database)]
-    MediaServer["靜態與媒體伺服 (static/ & media/)"] --> WebUI
-```
-
-- **後端框架**：Django 5.2（MTV 架構）
-- **程式語言**：Python 3.13+
-- **資料庫**：SQLite3
-- **前端介面**：HTML5、經典校務藍風格自定義 CSS、FontAwesome 6 圖標庫、原生 JavaScript
-- **通道相容**：配置支援 `0.0.0.0:8000` 與 Cloudflare Tunnel 遠端映射
-
----
-
-##  快速開始指南
-
-### 方法一：Windows 一鍵批次檔
-
-- **啟動伺服器**：雙擊根目錄的 [`start_server.bat`](file:///c:/UsersXXX/django_lab/start_server.bat)
-  - 終端機將自動調用虛擬環境並綁定 `0.0.0.0:8000`
-  - 開啟瀏覽器造訪：`http://127.0.0.1:8000/`
-- **關閉伺服器**：雙擊根目錄的 [`stop_server.bat`](file:///c:/Users/XXX/django_lab/stop_server.bat)
-  - 自動偵測並安全釋放佔用 8000 埠的行程。
-
----
-
-### 方法二：終端機命令列
-
-1. **進入專案目錄並啟用虛擬環境**：
-   ```powershell
-   cd c:\Users\XXX\django_lab
-   .\.venv\Scripts\Activate.ps1
-   ```
-
-2. **執行資料庫遷移**：
-   ```bash
-   python manage.py migrate
-   ```
-
-3. **初始化示範課表與預設帳號**：
-   ```bash
-   python manage.py seed_db
-   ```
-   > 輸出範例：  
-   > `成功初始化資料！`  
-   > `管理員帳號: admin (密碼: admin123)`  
-   > `學生帳號: student (密碼: student123)`
-
-4. **啟動本機開發伺服器**：
-   ```bash
-   python manage.py runserver 0.0.0.0:8000
-   ```
-
----
-
-##  專案目錄結構
-
-```text
-django_lab/
-├── config/                  # Django 專案核心設定
-│   ├── settings.py          # 全域設定 (時區、語言、INSTALLED_APPS、MEDIA)
-│   ├── urls.py              # 全域路由 (包含 static 與 media 路由)
-│   └── wsgi.py
-├── pages/                   # 選課系統核心應用 (App)
-│   ├── models.py            # 資料模型 (Course, Enrollment, UserProfile)
-│   ├── views.py             # 視圖邏輯 (登入、課表排程、加退選、教務管理)
-│   ├── urls.py              # 子路由設定
-│   ├── utils.py             # 衝堂演算法與課表初始化函式
-│   ├── tests.py             # 完整單元測試套件 (12 項測試)
-│   └── management/
-│       └── commands/
-│           └── seed_db.py   # 自定義管理指令: python manage.py seed_db
-├── templates/               # Django 前端模板
-│   ├── base.html            # 基礎版型 (經典校務藍風格導覽列、抽屜、通知)
-│   ├── index.html           # 課表大表、課程清單、加退選、教務管理介面
-│   ├── login.html           # 學生與教務登入入口
-│   └── profile_settings.html # 個人資料與頭像維護頁
-├── html/                    # 靜態展示與獨立資源庫
-│   ├── css/style.css        # 經典校務藍主題專用樣式表
-│   └── image/preview.webp   # 預設頭像與預覽圖
-├── media/                   # 使用者上傳之動態資源 (avatars)
-├── start_server.bat         # Windows 一鍵啟動腳本
-├── stop_server.bat          # Windows 一鍵停止腳本
-├── stop_server.py           # 跨平台連接埠安全關閉工具
-├── Do NOT README.md         # 傳奇級嚴禁閱讀專案手冊（就是本檔案）
-└── pyproject.toml           # 專案依賴規格
-```
-
----
-
-##  單元測試與品質驗證
-
-本專案具備完整且嚴格的單元測試驗證，涵蓋權限控制、衝堂預警、資料重置與加退選等業務邏輯。
-
-執行測試套件：
-```bash
-python manage.py test
-```
-
-### 測試覆蓋項目清單（27 項單元測試全部通過 ✔️）：
-1. `test_demo_initialization`：驗證預設帳號 `admin`、`student` 與 10 門必修課初始化正確性。
-2. `test_unauthenticated_redirects_to_login`：驗證訪客未登入時安全重導向至登入頁。
-3. `test_student_login_and_enroll_open_course`：驗證學生可正常選修開放之選修課（如 Linux 基礎教學）。
-4. `test_student_cannot_enroll_closed_course`：驗證學生無法加選教務處未開放之選修課。
-5. `test_student_time_conflict_prevention`：驗證同時間衝堂選課時系統主動阻擋機制。
-6. `test_student_drop_course`：驗證學生正常退選機制。
-7. `test_admin_toggle_course_status`：驗證教務管理員可切換課程開放/關閉狀態。
-8. `test_non_admin_cannot_toggle_course`：驗證一般學生無法偽造教務開關請求。
-9. `test_admin_add_course`：驗證教務管理員新增課程。
-10. `test_admin_delete_course`：驗證教務管理員刪除課程。
-11. `test_admin_reset_database`：驗證教務管理員一鍵重置資料庫。
-12. `test_semantic_directory_urls_and_tab_redirect`：驗證語意化目錄路徑與舊式 ?tab= 302 重新導向。
-13. `test_student_gender_and_add_student_feature`：驗證張家豪為男生、性別欄位存在與教務端新增資管一甲學生帳號並自動預載必修課。
-14. `test_admin_create_teacher_account`：驗證教務管理員可成功創建教師帳號，且非管理員無法建立。
-15. `test_teacher_same_name_separate_management_and_enrolled_roster`：驗證同名同姓「陳麒文」兩位老師各自獨立管理其開立課程、修課學生名冊及選修開關，權限完全隔離。
-16. `test_class_restricted_electives_and_admin_adjust_class`：驗證學生僅能加選自己班級之選修課，教務管理員調整學生班級後可加選新班級選修課。
-17. `test_class_timetable_switching`：驗證所有使用者皆可查閱資管一甲、資管二甲、資管三甲課表，且二、三甲暫無課程時顯示排程中提示。
-18. `test_admin_edit_student_id`：驗證教務管理員可在前台彈窗或後台修改學生學號與所屬班級。
-19. `test_teacher_display_username_yajusenpai`：驗證田所浩二教師帳號（`yajusenpai`）與課程之帳號名稱自動即時顯示。
-20. `test_admin_delete_student_graduated`：驗證管理員以「已畢業」為由刪除學生帳號成功。
-21. `test_admin_delete_student_dropped_out`：驗證管理員以「已退學」為由刪除學生帳號成功。
-22. `test_admin_delete_user_other_reason`：驗證管理員以「其他」並附帶詳細原因說明刪除帳號成功。
-23. `test_admin_delete_user_other_without_explanation_rejected`：驗證選擇「其他」卻未填寫原因說明時系統嚴格阻擋並保留帳號。
-24. `test_admin_delete_user_invalid_reason_rejected`：驗證未提供合法原因選項時系統阻擋。
-25. `test_admin_cannot_delete_self`：驗證管理員無法刪除自身的帳號。
-26. `test_non_admin_cannot_delete_user`：驗證一般學生無法呼叫刪除帳號功能（403 Forbidden）。
-27. `test_delete_teacher_preserves_courses`：驗證刪除教師帳號時該教師所開課程安全保留並解除關聯。
-
----
-
-
----
-
-*(C) 2026 National Taipei University of Business - Department of Information Management. Handcrafted with precision by SYH.*
+*(C) 2026 National Taipei University of Business - Department of Information Management.*

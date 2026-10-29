@@ -607,6 +607,131 @@ class CourseSelectionTestCase(TestCase):
         self.assertIsNone(c.teacher_user)
         self.assertEqual(c.name, '待保留課程')
 
+    def test_teacher_add_course_syncs_to_admin_and_students(self):
+        """驗證老師可新增課程，且新增後資訊即時同步至 admin 與 student 端"""
+        # 1. 建立田所浩二老師帳號
+        t_user = create_teacher_account(username='yajusenpai', name='田所浩二', password='teacher123')
+        self.client.force_login(t_user)
+
+        # 2. 老師由教師專區新增課程 HM102
+        add_data = {
+            'code': 'HM102',
+            'name': '日本現代次文化研究',
+            'target_class': '資管一甲',
+            'classroom': '藝405',
+            'credits': 2,
+            'category': 'ELECTIVE',
+            'day_of_week': 5,
+            'start_period': 8,
+            'end_period': 9,
+            'is_open_for_enrollment': 'on',
+            'max_students': 30,
+            'description': '次文化與網路迷因演進',
+            'color_tag': 'indigo',
+        }
+        res_teacher = self.client.post(reverse('pages:add_course'), add_data, follow=True)
+        self.assertEqual(res_teacher.status_code, 200)
+
+        # 驗證課程已成功寫入資料庫，且授課教師與帳號正確綁定為本人
+        course = Course.objects.get(code='HM102')
+        self.assertEqual(course.name, '日本現代次文化研究')
+        self.assertEqual(course.teacher, '田所浩二')
+        self.assertEqual(course.teacher_user, t_user)
+        self.assertEqual(course.display_teacher_username, 'yajusenpai')
+
+        # 3. 驗證教師端可看到自己新增的這門課
+        res_t_view = self.client.get(reverse('pages:teacher_courses'))
+        self.assertContains(res_t_view, '日本現代次文化研究')
+        self.assertContains(res_t_view, '藝405')
+
+        # 4. 驗證同步至 Admin 端：admin 課程管理清單立即可見此課程，並顯示教師名稱與帳號 (yajusenpai)
+        self.client.force_login(self.admin_user)
+        res_admin = self.client.get(reverse('pages:manage_courses'))
+        self.assertEqual(res_admin.status_code, 200)
+        self.assertContains(res_admin, '日本現代次文化研究')
+        self.assertContains(res_admin, '田所浩二')
+        self.assertContains(res_admin, '(yajusenpai)')
+
+        # 5. 驗證同步至 Student 端：資管一甲學生在選修專區立即可見此新課程，並能正常加選
+        self.client.force_login(self.student_user)
+        res_student_electives = self.client.get(reverse('pages:electives'))
+        self.assertEqual(res_student_electives.status_code, 200)
+        self.assertContains(res_student_electives, '日本現代次文化研究')
+        self.assertContains(res_student_electives, '田所浩二')
+
+        # 學生執行加選
+        res_enroll = self.client.post(reverse('pages:enroll_course', args=[course.id]), follow=True)
+        self.assertEqual(res_enroll.status_code, 200)
+        self.assertTrue(Enrollment.objects.filter(user=self.student_user, course=course).exists())
+
+        # 6. 驗證教師端之修課名單同步更新出現該學生
+        self.client.force_login(t_user)
+        res_t_roster = self.client.get(reverse('pages:teacher_courses'))
+        self.assertContains(res_t_roster, self.student_user.first_name)
+
+    def test_teacher_can_edit_and_delete_own_course(self):
+        """驗證教師可編輯與刪除自己開的課程，但無法竄改其他教師的課程"""
+        t1 = create_teacher_account(username='tea_alpha', name='甲老師')
+        t2 = create_teacher_account(username='tea_beta', name='乙老師')
+
+        c1 = Course.objects.create(
+            code='ALPHA01',
+            name='甲老師專題',
+            teacher='甲老師',
+            teacher_user=t1,
+            classroom='電101',
+            credits=2,
+            day_of_week=1,
+            start_period=8,
+            end_period=9
+        )
+
+        # 乙老師嘗試編輯甲老師的課程被拒絕 (403)
+        self.client.force_login(t2)
+        res_t2_edit = self.client.post(reverse('pages:edit_course', args=[c1.id]), {
+            'name': '被竄改的課程'
+        })
+        self.assertEqual(res_t2_edit.status_code, 403)
+
+        # 甲老師編輯自己的課程成功
+        self.client.force_login(t1)
+        res_t1_edit = self.client.post(reverse('pages:edit_course', args=[c1.id]), {
+            'name': '甲老師專題(更新版)',
+            'classroom': '電708',
+            'credits': 3,
+            'category': 'ELECTIVE',
+            'day_of_week': 1,
+            'start_period': 8,
+            'end_period': 9,
+            'max_students': 40
+        }, follow=True)
+        self.assertEqual(res_t1_edit.status_code, 200)
+        c1.refresh_from_db()
+        self.assertEqual(c1.name, '甲老師專題(更新版)')
+        self.assertEqual(c1.classroom, '電708')
+
+        # 乙老師嘗試刪除甲老師的課程被拒絕 (403)
+        self.client.force_login(t2)
+        res_t2_del = self.client.post(reverse('pages:delete_course', args=[c1.id]))
+        self.assertEqual(res_t2_del.status_code, 403)
+        self.assertTrue(Course.objects.filter(id=c1.id).exists())
+
+        # 甲老師刪除自己的課程成功
+        self.client.force_login(t1)
+        res_t1_del = self.client.post(reverse('pages:delete_course', args=[c1.id]), follow=True)
+        self.assertEqual(res_t1_del.status_code, 200)
+        self.assertFalse(Course.objects.filter(id=c1.id).exists())
+
+    def test_student_cannot_add_course(self):
+        """一般學生禁止呼叫新增課程功能 (403 Forbidden)"""
+        self.client.force_login(self.student_user)
+        res = self.client.post(reverse('pages:add_course'), {
+            'code': 'HACK01',
+            'name': '學生私開課程'
+        })
+        self.assertEqual(res.status_code, 403)
+        self.assertFalse(Course.objects.filter(code='HACK01').exists())
+
 
 
 

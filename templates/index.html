@@ -515,8 +515,13 @@
                     授課教師開課管理與修課學生名單總覽 (教務管理模式)
                 {% endif %}
             </div>
-            <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal;">
-                共 <strong>{{ teacher_courses|length }}</strong> 門授課課程
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal;">
+                    共 <strong>{{ teacher_courses|length }}</strong> 門授課課程
+                </div>
+                <button type="button" class="btn btn-primary" onclick="openAddCourseModal()" style="font-size: 0.85rem; padding: 0.35rem 0.85rem;">
+                    <i class="fa-solid fa-plus-circle"></i> 新增開課
+                </button>
             </div>
         </div>
         <div class="card-classic-body" style="padding: 1.25rem;">
@@ -546,7 +551,39 @@
                                 <span><i class="fa-solid fa-users"></i> 修課人數: <strong style="color: var(--univ-navy);">{{ tc_item.student_count }}</strong> / {{ tc_item.course.max_students }} 人</span>
                             </div>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                            <!-- 編輯課程按鈕 -->
+                            <button type="button" class="btn btn-outline-primary" style="font-size: 0.8rem; padding: 0.35rem 0.65rem;"
+                                data-id="{{ tc_item.course.id }}"
+                                data-code="{{ tc_item.course.code }}"
+                                data-name="{{ tc_item.course.name }}"
+                                data-teacher="{{ tc_item.course.teacher }}"
+                                data-classroom="{{ tc_item.course.classroom }}"
+                                data-credits="{{ tc_item.course.credits }}"
+                                data-category="{{ tc_item.course.category }}"
+                                data-day="{{ tc_item.course.day_of_week }}"
+                                data-start="{{ tc_item.course.start_period }}"
+                                data-end="{{ tc_item.course.end_period }}"
+                                data-is-open="{{ tc_item.course.is_open_for_enrollment }}"
+                                data-max="{{ tc_item.course.max_students }}"
+                                data-desc="{{ tc_item.course.description }}"
+                                data-color="{{ tc_item.course.color_tag }}"
+                                data-target-class="{{ tc_item.course.target_class }}"
+                                data-teacher-user-id="{{ tc_item.course.teacher_user_id }}"
+                                onclick="openEditCourseFromBtn(this)"
+                                title="編輯課程資訊與節次">
+                                <i class="fa-solid fa-pen-to-square"></i> 編輯
+                            </button>
+
+                            <!-- 刪除課程按鈕 -->
+                            <form action="{% url 'pages:delete_course' tc_item.course.id %}" method="POST" style="margin: 0;" onsubmit="return confirm('確定要刪除由您開設之課程【{{ tc_item.course.name|escapejs }}】嗎？刪除後學生將無法再選修此課程！');">
+                                {% csrf_token %}
+                                <input type="hidden" name="from_teacher" value="1">
+                                <button type="submit" class="btn btn-outline-danger" style="font-size: 0.8rem; padding: 0.35rem 0.65rem; color: #e11d48; border-color: #fda4af;" title="刪除此課程">
+                                    <i class="fa-solid fa-trash-can"></i> 刪除
+                                </button>
+                            </form>
+
                             <!-- 教師管理選修開關 -->
                             <form action="{% url 'pages:toggle_course_status' tc_item.course.id %}" method="POST" style="margin: 0;">
                                 {% csrf_token %}
@@ -623,7 +660,10 @@
                 <div style="text-align: center; padding: 3rem 1rem; color: #64748b;">
                     <i class="fa-solid fa-circle-exclamation" style="font-size: 2.5rem; color: #cbd5e1; margin-bottom: 0.75rem; display: block;"></i>
                     <strong style="font-size: 1.05rem; color: #334155; display: block; margin-bottom: 0.35rem;">目前無任教課程</strong>
-                    <p style="font-size: 0.85rem; color: #64748b; margin: 0;">若您已有新開設課程，請聯繫教務管理員在課程管理中將課程指派給您的教師帳號。</p>
+                    <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 1rem;">您可直接點擊下方「新增開課」按鈕自行建立新課程，或由教務處指派課程給您的教師帳號。</p>
+                    <button type="button" class="btn btn-primary" onclick="openAddCourseModal()">
+                        <i class="fa-solid fa-plus-circle"></i> 立即新增開課
+                    </button>
                 </div>
             {% endfor %}
         </div>
@@ -1292,6 +1332,11 @@
         </div>
         <form action="{% url 'pages:add_course' %}" method="POST">
             {% csrf_token %}
+            {% if is_teacher and not is_admin %}
+                <input type="hidden" name="next" value="{% url 'pages:teacher_courses' %}">
+            {% else %}
+                <input type="hidden" name="next" value="{% url 'pages:manage_courses' %}">
+            {% endif %}
             <div class="modal-body">
                 <div class="form-row">
                     <div class="form-group">
@@ -1304,6 +1349,18 @@
                     </div>
                 </div>
 
+                {% if is_teacher and not is_admin %}
+                <div class="form-row">
+                    <div class="form-group" style="flex: 2;">
+                        <label class="form-label">授課教師</label>
+                        <input type="text" name="teacher" id="addTeacherInput" class="form-control" value="{{ request.user.first_name|default:request.user.username }}" readonly style="background-color: #f8fafc; font-weight: 700; color: var(--univ-navy);">
+                        <input type="hidden" name="teacher_user_id" id="addTeacherUserId" value="{{ request.user.id }}">
+                        <small style="color: #0284c7; display: block; margin-top: 0.25rem;">
+                            <i class="fa-solid fa-circle-check"></i> 此課程將直接綁定至您的教師帳號（{{ request.user.username }}），開課後立即同步至教務管理總表及學生選課清單。
+                        </small>
+                    </div>
+                </div>
+                {% else %}
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">授課教師姓名</label>
@@ -1327,6 +1384,7 @@
                         </select>
                     </div>
                 </div>
+                {% endif %}
 
                 <div class="form-row">
                     <div class="form-group">
@@ -1449,6 +1507,11 @@
         </div>
         <form id="editCourseForm" method="POST">
             {% csrf_token %}
+            {% if is_teacher and not is_admin %}
+                <input type="hidden" name="next" value="{% url 'pages:teacher_courses' %}">
+            {% else %}
+                <input type="hidden" name="next" value="{% url 'pages:manage_courses' %}">
+            {% endif %}
             <div class="modal-body">
                 <div class="form-row">
                     <div class="form-group">
@@ -1461,6 +1524,16 @@
                     </div>
                 </div>
 
+                {% if is_teacher and not is_admin %}
+                <div class="form-row">
+                    <div class="form-group" style="flex: 2;">
+                        <label class="form-label">授課教師</label>
+                        <input type="text" id="editTeacher" class="form-control" disabled style="background-color: #f8fafc; font-weight: 700; color: var(--univ-navy);">
+                        <input type="hidden" name="teacher" value="{{ request.user.first_name|default:request.user.username }}">
+                        <input type="hidden" name="teacher_user_id" id="editTeacherUserId" value="{{ request.user.id }}">
+                    </div>
+                </div>
+                {% else %}
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">授課教師姓名</label>
@@ -1484,6 +1557,7 @@
                         </select>
                     </div>
                 </div>
+                {% endif %}
 
                 <div class="form-row">
                     <div class="form-group">
@@ -1828,10 +1902,13 @@
     }
 
     function openAddCourseModal() {
-        const tInput = document.getElementById('addTeacherInput');
-        if (tInput) tInput.value = '';
-        const tuSelect = document.getElementById('addTeacherUserId');
-        if (tuSelect) tuSelect.value = '';
+        const tuField = document.getElementById('addTeacherUserId');
+        const isTeacherOnly = tuField && tuField.type === 'hidden';
+        if (!isTeacherOnly) {
+            const tInput = document.getElementById('addTeacherInput');
+            if (tInput) tInput.value = '';
+            if (tuField) tuField.value = '';
+        }
         openModal('addCourseModal');
     }
 

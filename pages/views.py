@@ -390,14 +390,19 @@ def toggle_course_status(request, course_id):
 @login_required
 @require_POST
 def add_course(request):
-    """管理員新增課程"""
-    if not (request.user.is_staff or request.user.username == 'admin'):
-        return HttpResponseForbidden("僅教務管理員可新增課程。")
+    """管理員或授課教師新增課程"""
+    is_admin = request.user.is_staff or request.user.username == 'admin'
+    user_role = getattr(request.user.profile, 'role', 'STUDENT')
+    is_teacher = (user_role == 'TEACHER')
+
+    if not (is_admin or is_teacher):
+        return HttpResponseForbidden("僅教務管理員或授課教師可新增課程。")
 
     code = request.POST.get('code', '').strip().upper()
     name = request.POST.get('name', '').strip()
-    teacher = request.POST.get('teacher', '').strip()
-    teacher_user_id = request.POST.get('teacher_user_id', '').strip()
+    next_url = request.POST.get('next', '').strip()
+    default_redirect = 'pages:teacher_courses' if (is_teacher and not is_admin) else 'pages:manage_courses'
+
     target_class = request.POST.get('target_class', '資管一甲').strip()
     if target_class not in ['資管一甲', '資管二甲', '資管三甲', 'ALL']:
         target_class = '資管一甲'
@@ -415,23 +420,29 @@ def add_course(request):
 
     if not code or not name:
         messages.error(request, "新增失敗：課程代碼與名稱為必填項目！")
-        return redirect('pages:manage_courses')
+        return redirect(next_url or default_redirect)
 
     if end_period < start_period:
         messages.error(request, "新增失敗：結束節次不能小於開始節次！")
-        return redirect('pages:manage_courses')
+        return redirect(next_url or default_redirect)
 
     if Course.objects.filter(code=code).exists():
         messages.error(request, f"新增失敗：課程代碼【{code}】已存在！")
-        return redirect('pages:manage_courses')
+        return redirect(next_url or default_redirect)
 
-    teacher_user = None
-    if teacher_user_id:
-        teacher_user = User.objects.filter(id=teacher_user_id).first()
-        if teacher_user:
-            teacher = teacher_user.first_name or teacher_user.username
-    elif teacher:
-        teacher_user = User.objects.filter(first_name=teacher, profile__role='TEACHER').first()
+    if is_teacher and not is_admin:
+        teacher_user = request.user
+        teacher = request.user.first_name or request.user.username
+    else:
+        teacher = request.POST.get('teacher', '').strip()
+        teacher_user_id = request.POST.get('teacher_user_id', '').strip()
+        teacher_user = None
+        if teacher_user_id:
+            teacher_user = User.objects.filter(id=teacher_user_id).first()
+            if teacher_user:
+                teacher = teacher_user.first_name or teacher_user.username
+        elif teacher:
+            teacher_user = User.objects.filter(first_name=teacher, profile__role='TEACHER').first()
 
     Course.objects.create(
         code=code,
@@ -451,22 +462,31 @@ def add_course(request):
         color_tag=color_tag
     )
 
-    messages.success(request, f"成功新增課程：【{name}】（代碼: {code}，開課班級: {target_class}）！")
-    return redirect('pages:manage_courses')
+    messages.success(
+        request,
+        f"成功新增課程：【{name}】（代碼: {code}，授課教師: {teacher}，開課班級: {target_class}）！課程資訊已即時同步至全體學生選課專區及教務管理總表。"
+    )
+    return redirect(next_url or default_redirect)
 
 
 @login_required
 @require_POST
 def edit_course(request, course_id):
-    """管理員編輯課程內容與節次"""
-    if not (request.user.is_staff or request.user.username == 'admin'):
-        return HttpResponseForbidden("僅教務管理員可編輯課程。")
-
+    """管理員或授課教師編輯課程內容與節次"""
     course = get_object_or_404(Course, id=course_id)
+    is_admin = request.user.is_staff or request.user.username == 'admin'
+    user_role = getattr(request.user.profile, 'role', 'STUDENT')
+    is_teacher_owner = (user_role == 'TEACHER') and (
+        course.teacher_user == request.user or (course.teacher == request.user.first_name and course.teacher_user is None)
+    )
+
+    if not (is_admin or is_teacher_owner):
+        return HttpResponseForbidden("僅教務管理員或該課程之授課教師可編輯課程。")
 
     name = request.POST.get('name', '').strip()
-    teacher = request.POST.get('teacher', '').strip()
-    teacher_user_id = request.POST.get('teacher_user_id', '').strip()
+    next_url = request.POST.get('next', '').strip()
+    default_redirect = 'pages:teacher_courses' if (is_teacher_owner and not is_admin) else 'pages:manage_courses'
+
     target_class = request.POST.get('target_class', course.target_class).strip()
     if target_class not in ['資管一甲', '資管二甲', '資管三甲', 'ALL']:
         target_class = '資管一甲'
@@ -484,26 +504,29 @@ def edit_course(request, course_id):
 
     if not name:
         messages.error(request, "編輯失敗：課程名稱不能為空！")
-        return redirect('pages:manage_courses')
+        return redirect(next_url or default_redirect)
 
     if end_period < start_period:
         messages.error(request, "編輯失敗：結束節次不能小於開始節次！")
-        return redirect('pages:manage_courses')
+        return redirect(next_url or default_redirect)
 
-    if teacher_user_id:
-        teacher_user = User.objects.filter(id=teacher_user_id).first()
-        if teacher_user:
-            course.teacher_user = teacher_user
-            course.teacher = teacher_user.first_name or teacher_user.username
-    elif 'teacher_user_id' in request.POST and not teacher_user_id:
-        course.teacher_user = None
-        if teacher:
-            course.teacher = teacher
-    else:
-        if teacher:
-            course.teacher = teacher
-            if not course.teacher_user:
-                course.teacher_user = User.objects.filter(first_name=teacher, profile__role='TEACHER').first()
+    if is_admin:
+        teacher = request.POST.get('teacher', '').strip()
+        teacher_user_id = request.POST.get('teacher_user_id', '').strip()
+        if teacher_user_id:
+            teacher_user = User.objects.filter(id=teacher_user_id).first()
+            if teacher_user:
+                course.teacher_user = teacher_user
+                course.teacher = teacher_user.first_name or teacher_user.username
+        elif 'teacher_user_id' in request.POST and not teacher_user_id:
+            course.teacher_user = None
+            if teacher:
+                course.teacher = teacher
+        else:
+            if teacher:
+                course.teacher = teacher
+                if not course.teacher_user:
+                    course.teacher_user = User.objects.filter(first_name=teacher, profile__role='TEACHER').first()
 
     course.name = name
     course.target_class = target_class
@@ -520,21 +543,29 @@ def edit_course(request, course_id):
     course.save()
 
     messages.success(request, f"已成功更新課程【{course.name}】的資料與時段！")
-    return redirect('pages:manage_courses')
+    return redirect(next_url or default_redirect)
 
 
 @login_required
 @require_POST
 def delete_course(request, course_id):
-    """管理員刪除課程"""
-    if not (request.user.is_staff or request.user.username == 'admin'):
-        return HttpResponseForbidden("僅教務管理員可刪除課程。")
-
+    """管理員或授課教師刪除課程"""
     course = get_object_or_404(Course, id=course_id)
+    is_admin = request.user.is_staff or request.user.username == 'admin'
+    user_role = getattr(request.user.profile, 'role', 'STUDENT')
+    is_teacher_owner = (user_role == 'TEACHER') and (
+        course.teacher_user == request.user or (course.teacher == request.user.first_name and course.teacher_user is None)
+    )
+
+    if not (is_admin or is_teacher_owner):
+        return HttpResponseForbidden("僅教務管理員或該課程之授課教師可刪除課程。")
+
     cname = course.name
     course.delete()
     messages.success(request, f"課程【{cname}】已成功刪除。")
-    return redirect('pages:manage_courses')
+    if is_admin and not (is_teacher_owner and request.POST.get('from_teacher')):
+        return redirect('pages:manage_courses')
+    return redirect('pages:teacher_courses')
 
 
 @login_required
