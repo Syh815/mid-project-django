@@ -778,10 +778,14 @@ def delete_user(request):
         messages.error(request, "刪除失敗：無法刪除管理員帳號！")
         return redirect('pages:students_roster')
 
-    # 原因驗證
-    valid_reasons = ['已退學', '已畢業', '其他']
+    target_role = "學生"
+    if hasattr(target_user, 'profile') and target_user.profile.role == 'TEACHER':
+        target_role = "教師"
+
+    # 原因驗證（學生：已退學、已畢業；教師：退休、離職；或皆可選其他）
+    valid_reasons = ['已退學', '已畢業', '退休', '離職', '其他']
     if reason_type not in valid_reasons:
-        messages.error(request, "刪除失敗：請選擇刪除原因（已退學、已畢業、或其他）！")
+        messages.error(request, "刪除失敗：請選擇合法的刪除原因（學生：已退學、已畢業；教師：退休、離職；或其他）！")
         return redirect('pages:students_roster')
 
     if reason_type == '其他' and not reason_other:
@@ -791,9 +795,6 @@ def delete_user(request):
     reason_str = f"其他（{reason_other}）" if reason_type == '其他' else reason_type
     target_name = target_user.first_name or target_user.username
     target_username = target_user.username
-    target_role = "學生"
-    if hasattr(target_user, 'profile') and target_user.profile.role == 'TEACHER':
-        target_role = "教師"
 
     # 若為教師，解除其開課綁定，避免刪除課程本身
     Course.objects.filter(teacher_user=target_user).update(teacher_user=None)

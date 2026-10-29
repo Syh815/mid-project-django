@@ -1279,14 +1279,31 @@
                     <label class="form-label" style="font-weight: 700; color: #334155;">
                         刪除原因 <span style="color: red;">*</span>
                     </label>
-                    <div style="display: flex; flex-direction: column; gap: 0.6rem; padding: 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+                    <!-- 學生刪除原因選項 -->
+                    <div id="deleteReasonStudentOptions" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
                         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem; margin-bottom: 0;">
-                            <input type="radio" name="reason_type" value="已退學" checked onchange="handleDeleteReasonChange(this)">
+                            <input type="radio" name="reason_type" id="reasonStudentDropout" value="已退學" checked onchange="handleDeleteReasonChange(this)">
                             <span><strong>已退學</strong> (學生退學離校或註銷學籍)</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem; margin-bottom: 0;">
                             <input type="radio" name="reason_type" value="已畢業" onchange="handleDeleteReasonChange(this)">
                             <span><strong>已畢業</strong> (學生修畢規定學分畢業)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem; margin-bottom: 0;">
+                            <input type="radio" name="reason_type" value="其他" onchange="handleDeleteReasonChange(this)">
+                            <span><strong>其他</strong> (請於下方說明原因)</span>
+                        </label>
+                    </div>
+
+                    <!-- 教師刪除原因選項 -->
+                    <div id="deleteReasonTeacherOptions" style="display: none; flex-direction: column; gap: 0.6rem; padding: 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem; margin-bottom: 0;">
+                            <input type="radio" name="reason_type" id="reasonTeacherRetire" value="退休" onchange="handleDeleteReasonChange(this)">
+                            <span><strong>退休</strong> (教師屆齡或自願退休)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem; margin-bottom: 0;">
+                            <input type="radio" name="reason_type" value="離職" onchange="handleDeleteReasonChange(this)">
+                            <span><strong>離職</strong> (教師轉任、辭職或不續聘)</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.95rem; margin-bottom: 0;">
                             <input type="radio" name="reason_type" value="其他" onchange="handleDeleteReasonChange(this)">
@@ -1828,13 +1845,31 @@
         document.getElementById('deleteUserName').value = userName + ' (' + role + ')';
         document.getElementById('deleteUserUsername').value = username;
 
-        // 重設單選選項為預設（已退學）
+        var studentOptions = document.getElementById('deleteReasonStudentOptions');
+        var teacherOptions = document.getElementById('deleteReasonTeacherOptions');
         var radios = document.getElementsByName('reason_type');
+
+        // 取消所有勾選
         for (var i = 0; i < radios.length; i++) {
-            if (radios[i].value === '已退學') {
-                radios[i].checked = true;
+            radios[i].checked = false;
+        }
+
+        if (role === '教師') {
+            if (studentOptions) studentOptions.style.display = 'none';
+            if (teacherOptions) {
+                teacherOptions.style.display = 'flex';
+                var rRetire = document.getElementById('reasonTeacherRetire');
+                if (rRetire) rRetire.checked = true;
+            }
+        } else {
+            if (teacherOptions) teacherOptions.style.display = 'none';
+            if (studentOptions) {
+                studentOptions.style.display = 'flex';
+                var rDropout = document.getElementById('reasonStudentDropout');
+                if (rDropout) rDropout.checked = true;
             }
         }
+
         var otherGroup = document.getElementById('deleteReasonOtherGroup');
         var otherInput = document.getElementById('deleteReasonOtherInput');
         if (otherGroup) otherGroup.style.display = 'none';
@@ -1866,7 +1901,7 @@
     function validateDeleteUserForm() {
         var selectedReason = document.querySelector('input[name="reason_type"]:checked');
         if (!selectedReason) {
-            alert('請選擇刪除原因（已退學、已畢業、或其他）！');
+            alert('請選擇刪除原因！');
             return false;
         }
         if (selectedReason.value === '其他') {

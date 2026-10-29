@@ -607,6 +607,36 @@ class CourseSelectionTestCase(TestCase):
         self.assertIsNone(c.teacher_user)
         self.assertEqual(c.name, '待保留課程')
 
+    def test_admin_delete_teacher_retired(self):
+        """管理員以「退休」為由刪除教師帳號"""
+        self.client.force_login(self.admin_user)
+        tea = create_teacher_account(username='tea_retire', name='退休教師A')
+        user_id = tea.id
+
+        res = self.client.post(reverse('pages:delete_user'), {
+            'user_id': user_id,
+            'reason_type': '退休'
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(User.objects.filter(id=user_id).exists())
+        self.assertContains(res, '已成功刪除教師帳號【退休教師A】')
+        self.assertContains(res, '原因：退休')
+
+    def test_admin_delete_teacher_resigned(self):
+        """管理員以「離職」為由刪除教師帳號"""
+        self.client.force_login(self.admin_user)
+        tea = create_teacher_account(username='tea_resign', name='離職教師B')
+        user_id = tea.id
+
+        res = self.client.post(reverse('pages:delete_user'), {
+            'user_id': user_id,
+            'reason_type': '離職'
+        }, follow=True)
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(User.objects.filter(id=user_id).exists())
+        self.assertContains(res, '已成功刪除教師帳號【離職教師B】')
+        self.assertContains(res, '原因：離職')
+
     def test_teacher_add_course_syncs_to_admin_and_students(self):
         """驗證老師可新增課程，且新增後資訊即時同步至 admin 與 student 端"""
         # 1. 建立田所浩二老師帳號
