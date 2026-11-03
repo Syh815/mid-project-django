@@ -1,6 +1,6 @@
 # 國立大學 資訊管理學系 網路選課與動態課表系統
 
-> **嚴正聲明**：*This project was (definitely) NOT created by Gemini and Antigravity.* —— by **SYH**
+> ：*This project was (definitely) NOT created by Gemini and Antigravity.* —— by **SYH**
 
 ---
 組員 :
