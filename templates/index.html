@@ -688,6 +688,14 @@
                 <i class="fa-solid fa-sliders"></i> 全系課程維護管理與選修開放設定
             </div>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <!-- 一鍵開啟/關閉選修按鈕 -->
+<a href="?action=open_all" class="btn btn-success" style="padding: 0.375rem 0.75rem; font-size: 0.9rem;" onclick="return confirm('確定要全面開放所有課程選修嗎？')">
+    <i class="fa-solid fa-unlock"></i> ⚡ 一鍵全面開放
+</a>
+<a href="?action=close_all" class="btn btn-danger" style="padding: 0.375rem 0.75rem; font-size: 0.9rem;" onclick="return confirm('確定要全面關閉所有課程選修嗎？')">
+    <i class="fa-solid fa-lock"></i> 🔒 一鍵全面關閉
+</a>
+
                 <button type="button" class="btn btn-primary" onclick="openAddCourseModal()" id="btn-add-course">
                     <i class="fa-solid fa-plus"></i> 新增課程
                 </button>

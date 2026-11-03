@@ -61,7 +61,7 @@ def index(request, tab=None):
     # 確保基本示範資料存在
     if not User.objects.filter(username__in=['admin', 'student']).exists() or not Course.objects.exists():
         init_demo_data()
-
+    
     # 未登入者一律強制重導向至 /login/
     if not request.user.is_authenticated:
         return redirect('pages:login')
@@ -98,6 +98,22 @@ def index(request, tab=None):
 
     # 取得所有課程與選課紀錄（含授課教師關聯與修課學生）
     all_courses = Course.objects.all().select_related('teacher_user').prefetch_related('enrollments__user__profile')
+
+    # === 一鍵全面開啟/關閉選修功能 ===
+    action = request.GET.get('action')
+    if action in ['open_all', 'close_all'] and is_admin:
+        new_status = True if action == 'open_all' else False
+        
+        # 💡 用 globals() 完美繞過 Python 的區域變數干擾與大小寫問題
+        TargetModel = globals().get('Course')
+        if TargetModel:
+            TargetModel.objects.update(is_open_for_enrollment=new_status)
+        
+        msg = "已成功【全面開放】所有課程選修！" if new_status else "已成功【全面關閉】所有課程選修！"
+        messages.success(request, msg)
+        
+        return redirect('/manage/courses/')
+    # =======================================
 
     # 學生已選課程
     if is_student:
@@ -849,6 +865,8 @@ def delete_user(request):
         f"已成功刪除{target_role}帳號【{target_name}】（帳號: {target_username}），原因：{reason_str}。"
     )
     return redirect('pages:students_roster')
+
+
 
 
 
