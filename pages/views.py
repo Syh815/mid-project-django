@@ -99,20 +99,20 @@ def index(request, tab=None):
     # 取得所有課程與選課紀錄（含授課教師關聯與修課學生）
     all_courses = Course.objects.all().select_related('teacher_user').prefetch_related('enrollments__user__profile')
 
-    # === 一鍵全面開啟/關閉選修功能 ===
+    # === 一鍵開放/關閉所有選修課功能 ===
     action = request.GET.get('action')
     if action in ['open_all', 'close_all'] and is_admin:
         new_status = True if action == 'open_all' else False
         
-        # 💡 用 globals() 完美繞過 Python 的區域變數干擾與大小寫問題
-        TargetModel = globals().get('Course')
-        if TargetModel:
-            TargetModel.objects.update(is_open_for_enrollment=new_status)
+        # 僅針對「選修」課程進行開放或關閉，必修課程不開放自由選修
+        Course.objects.filter(category='ELECTIVE').update(is_open_for_enrollment=new_status)
+        if new_status:
+            Course.objects.filter(category='REQUIRED').update(is_open_for_enrollment=False)
         
-        msg = "已成功【全面開放】所有課程選修！" if new_status else "已成功【全面關閉】所有課程選修！"
+        msg = "已成功【開放選修】所有選修課！" if new_status else "已成功【關閉】所有選修課！"
         messages.success(request, msg)
         
-        return redirect('/manage/courses/')
+        return redirect('pages:manage_courses')
     # =======================================
 
     # 學生已選課程

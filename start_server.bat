@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 title Django Server (Port 8000)
 cd /d "%~dp0"
 

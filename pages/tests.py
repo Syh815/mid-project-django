@@ -798,3 +798,46 @@ class CourseSelectionTestCase(TestCase):
         }, follow=True)
         self.assertEqual(res_blocked.status_code, 200)
         self.assertContains(res_blocked, '登入失敗次數過多，為維護帳號資訊安全')
+
+    def test_admin_open_and_close_all_electives(self):
+        """管理員一鍵開放與一鍵關閉所有選修課（必修課程不變）"""
+        self.client.force_login(self.admin_user)
+
+        # 1. 驗證管理員頁面按鈕文字已無特殊 emote 且為新文字
+        res_page = self.client.get(reverse('pages:manage_courses'))
+        self.assertEqual(res_page.status_code, 200)
+        self.assertContains(res_page, '一鍵開放選修所有選修課')
+        self.assertContains(res_page, '一鍵關閉所有選修課')
+        self.assertNotContains(res_page, '⚡')
+        self.assertNotContains(res_page, '一鍵全面開放')
+        self.assertNotContains(res_page, '一鍵全面關閉')
+
+        # 2. 測試一鍵開放所有選修課
+        res_open = self.client.get(reverse('pages:manage_courses') + '?action=open_all', follow=True)
+        self.assertEqual(res_open.status_code, 200)
+        self.assertContains(res_open, '已成功【開放選修】所有選修課！')
+        # 所有選修課均應為開放
+        electives = Course.objects.filter(category='ELECTIVE')
+        self.assertTrue(electives.exists())
+        self.assertTrue(all(c.is_open_for_enrollment for c in electives))
+        # 所有必修課均維持未開放
+        required = Course.objects.filter(category='REQUIRED')
+        self.assertTrue(required.exists())
+        self.assertTrue(all(not c.is_open_for_enrollment for c in required))
+
+        # 3. 測試一鍵關閉所有選修課
+        res_close = self.client.get(reverse('pages:manage_courses') + '?action=close_all', follow=True)
+        self.assertEqual(res_close.status_code, 200)
+        self.assertContains(res_close, '已成功【關閉】所有選修課！')
+        electives = Course.objects.filter(category='ELECTIVE')
+        self.assertTrue(all(not c.is_open_for_enrollment for c in electives))
+        required = Course.objects.filter(category='REQUIRED')
+        self.assertTrue(all(not c.is_open_for_enrollment for c in required))
+
+        # 4. 學生無法執行一鍵開放或關閉
+        self.client.force_login(self.student_user)
+        self.client.get(reverse('pages:manage_courses') + '?action=open_all')
+        # 選修課應維持關閉狀態
+        electives = Course.objects.filter(category='ELECTIVE')
+        self.assertTrue(all(not c.is_open_for_enrollment for c in electives))
+
