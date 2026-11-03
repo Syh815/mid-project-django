@@ -2,6 +2,14 @@ import os
 import subprocess
 import sys
 
+# 確保在 Windows 終端機能正確輸出繁體中文 UTF-8
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 def stop_server_on_port(port=8000):
     print("=" * 60)
     print(f"  [關閉中] 正在尋找佔用 Port {port} 之服務/進程...")

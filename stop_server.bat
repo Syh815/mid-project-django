@@ -1,6 +1,5 @@
 @echo off
-chcp 65001 >nul
-title 關閉 Django Server (Port 8000)
+title Stop Django Server (Port 8000)
 cd /d "%~dp0"
 
 if exist ".\.venv\Scripts\python.exe" (
@@ -10,5 +9,4 @@ if exist ".\.venv\Scripts\python.exe" (
 )
 
 echo.
-echo 請按任意鍵關閉此視窗...
-pause >nul
+pause

@@ -10,9 +10,11 @@
 ```text
 django_lab/                                  # 專案根目錄
 ├── manage.py                                # Django CLI 指令入口 (runserver, test, makemigrations, etc.)
-├── start_server.bat                         # Windows 一鍵啟動腳本 (自動偵測 .venv / python，Port 8000)
-├── stop_server.bat                          # Windows 一鍵關閉腳本 (呼叫 stop_server.py)
+├── start_server.bat                         # Windows 一鍵啟動腳本 (純 ASCII 啟動器，呼叫 start_server.py)
+├── start_server.py                          # 服務啟動 Python 腳本 (輸出 UTF-8 繁中資訊，啟動 0.0.0.0:8000)
+├── stop_server.bat                          # Windows 一鍵關閉腳本 (純 ASCII 啟動器，呼叫 stop_server.py)
 ├── stop_server.py                           # 服務關閉 Python 腳本 (以 netstat 搜尋並結束佔用 Port 8000 之 PID)
+├── .gitattributes                           # 確保 *.bat 於 Git 簽出時維持 CRLF 格式
 ├── db.sqlite3                               # 預設 SQLite 關聯式資料庫
 ├── pyproject.toml / requirements.txt        # 專案依賴管理與套件清單 (Django >= 6.1.1 等)
 ├── README.md                                # 專案說明文件 (系統特色、預設測試帳號、啟動說明)
@@ -308,5 +310,6 @@ erDiagram
   - `login.html` & `recovery/forgot_password.html`：簡潔登入與密碼重設卡片。
 
 ### 4.6 維運批次檔與輔助工具
-- **`start_server.bat`**：加入 `chcp 65001 >nul` 解決繁體中文命令列亂碼與解析錯誤，自動判斷虛擬環境路徑後啟動 `0.0.0.0:8000`。
+- **`start_server.bat` / `start_server.py`**：採用純 ASCII 批次啟動器與 Python 雙層架構，徹底根絕 Windows CMD 換行編碼錯位與語法解析錯誤，啟動 `0.0.0.0:8000` 並優雅處理 Ctrl+C 中斷訊號。
 - **`stop_server.bat` / `stop_server.py`**：透過 Windows `netstat -ano` 解析監聽 Port 8000 之處理程序 PID，並以 `taskkill /F /PID` 乾淨釋放連接埠，避免伺服器重啟時發生衝突。
+- **`.gitattributes`**：強制所有批次檔簽出時採用 Windows CRLF (`\r\n`) 格式。
